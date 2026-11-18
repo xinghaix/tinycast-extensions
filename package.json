@@ -32,6 +32,6 @@
   },
   "dependencies": {
     "@noble/hashes": "^1.7.1",
-    "qrcode-generator": "^1.4.4"
+    "qrcode-generator": "^2.0.4"
   }
 }
