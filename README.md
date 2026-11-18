@@ -140,7 +140,7 @@ pnpm install-local  # 安装到 ~/Library/Application Support/com.abueammar.tiny
 
 ## 开发、验证与发布
 
-仓库 `main` 分支受保护，所有合入需通过 GitHub Actions `CI` 门禁（`Hygiene & Secret Check` + `Build, Test & Verify (macOS)`）：
+仓库 `main` 分支受保护，所有合入需通过 GitHub Actions `CI` 门禁（`Hygiene, Typecheck & Tests` + `Build, Test & Verify (macOS)`）：
 
 ```bash
 pnpm install --frozen-lockfile

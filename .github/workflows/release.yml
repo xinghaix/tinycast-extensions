@@ -15,22 +15,37 @@ permissions:
   contents: write
 
 jobs:
-  hygiene:
-    name: Hygiene & Secret Check
+  hygiene-and-main-gate:
+    name: Verify Release Ancestor & Hygiene
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require release commit to be on main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Refusing to release: $GITHUB_SHA is not an ancestor of origin/main" >&2
+            exit 1
+          fi
+          echo "Verified release commit $GITHUB_SHA is on origin/main"
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node scripts/check-hygiene.mjs
+
+      - name: Run repository hygiene & manifest check
+        run: node scripts/check-hygiene.mjs
 
   release:
     name: Build Universal Release & Publish
-    needs: hygiene
-    runs-on: macos-15
-    timeout-minutes: 20
+    needs: hygiene-and-main-gate
+    runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
