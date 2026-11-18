@@ -1,0 +1,19 @@
+name: "功能建议 (Feature Request)"
+description: "建议新增开发者工具、算法或快捷方式"
+title: "[Feat]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: "希望解决的场景或需求"
+      placeholder: "请描述日常开发中遇到的痛点或高频场景..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: "期望功能与交互设计"
+      placeholder: "例如：希望支持某编解码格式、某快捷键行为或工作台卡片..."
+    validations:
+      required: true

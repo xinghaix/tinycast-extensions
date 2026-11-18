@@ -4,7 +4,7 @@
   "title": "DevKit 开发者工具箱",
   "description": "UUID 全版本生成与解析、时间戳多时区转换、通用 Hash/HMAC/文件校验、多种算法编解码、AES 加解密与 JSON 工具（纯原生悬浮工作台）",
   "icon": "devkit.png",
-  "author": "tinycast-extensions",
+  "author": "xinghaix",
   "license": "MIT",
   "categories": ["Developer Tools"],
   "platforms": ["macOS"],

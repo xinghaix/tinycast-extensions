@@ -4,7 +4,7 @@
   "title": "Quick Shortcuts 效率快捷入口",
   "description": "安全密码与密钥生成、选中文本格式变换、离线矢量二维码、Cron 调度解析、本机 IP 与端口管理、剪贴板智能转换与 Finder 快捷入口",
   "icon": "shortcuts.png",
-  "author": "tinycast-extensions",
+  "author": "xinghaix",
   "license": "MIT",
   "categories": ["Productivity", "Developer Tools", "System"],
   "platforms": ["macOS"],

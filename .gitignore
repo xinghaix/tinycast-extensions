@@ -1,4 +1,15 @@
 node_modules/
 .DS_Store
 dist/
+release/
 *.tsbuildinfo
+.build/
+.swiftpm/
+*.xcuserstate
+.env
+.env.*
+*.pem
+*.key
+*.p12
+.vscode/
+.idea/

@@ -1,0 +1,43 @@
+name: "Bug 反馈 (Bug Report)"
+description: "反馈扩展命令异常、界面交互或兼容性问题"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "感谢反馈问题！请尽量提供完整环境信息以帮助快速定位。"
+  - type: dropdown
+    id: component
+    attributes:
+      label: "涉及模块"
+      options:
+        - "DevKit 开发者工具箱 (tiny-devkit)"
+        - "Quick Shortcuts 效率快捷入口 (tiny-shortcuts)"
+        - "原生悬浮工作台 (tinycast-devkit)"
+        - "构建 / 安装脚本 (scripts)"
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: "具体命令或工具页面"
+      placeholder: "例如：uuid-generator / color-converter / network-ports"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: "问题描述与复现步骤"
+      placeholder: |
+        1. 在 Tinycast 中输入...
+        2. 执行操作...
+        3. 实际结果 vs 预期结果...
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: "运行环境 (macOS / Tinycast 版本 / 芯片架构)"
+      placeholder: "例如：macOS 15.4 / Apple M3 / Tinycast 2.0.3"
+    validations:
+      required: true

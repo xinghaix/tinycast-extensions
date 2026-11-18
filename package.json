@@ -3,11 +3,23 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "description": "Native SwiftUI + AppKit developer workbench (tinycast-devkit) & efficiency shortcuts suite built for Tinycast",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xinghaix/tinycast-extensions.git"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:universal": "node scripts/build.mjs --universal",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test packages/shared/test/*.test.ts",
+    "check:hygiene": "node scripts/check-hygiene.mjs",
     "verify": "node scripts/verify-tinycast.mjs",
+    "verify:ci": "node scripts/verify-tinycast.mjs --standalone",
     "install-local": "node scripts/install-local.mjs"
   },
   "devDependencies": {

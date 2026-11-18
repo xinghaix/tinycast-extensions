@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    name: Hygiene & Secret Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run repository hygiene & manifest check
+        run: node scripts/check-hygiene.mjs
+
+  build-and-verify:
+    name: Build, Test & Verify (macOS)
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "12"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript typecheck
+        run: pnpm typecheck
+
+      - name: Run shared unit tests
+        run: pnpm test
+
+      - name: Build Universal macOS binary & extensions
+        run: pnpm build:universal
+
+      - name: Verify Universal architectures (arm64 + x86_64)
+        run: |
+          lipo -info dist/tiny-devkit/assets/tinycast-devkit
+          lipo -archs dist/tiny-devkit/assets/tinycast-devkit | grep -q "arm64"
+          lipo -archs dist/tiny-devkit/assets/tinycast-devkit | grep -q "x86_64"
+
+      - name: Verify bundles, --self-test & 5-way flock
+        run: pnpm verify:ci
+
+      - name: Upload built extension bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinycast-extensions-dist-universal
+          path: dist/
+          retention-days: 7
+          include-hidden-files: false

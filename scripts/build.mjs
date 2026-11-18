@@ -11,6 +11,8 @@ const swiftSourceDir = join(rootDir, "native/devkit-app/Sources");
 const buildTmpDir = join(distRoot, ".build-tmp");
 const compiledBinaryPath = join(buildTmpDir, "tinycast-devkit");
 
+const universalBuild = process.argv.includes("--universal") || process.env.BUILD_UNIVERSAL === "1";
+
 const EXTERNAL_MODULES = [
   "@raycast/api",
   "react",
@@ -22,46 +24,64 @@ const EXTERNAL_MODULES = [
   ...builtinModules.map((m) => `node:${m}`),
 ];
 
+function compileSwiftSlice(targetTriple, outputPath, swiftFiles) {
+  execFileSync(
+    "swiftc",
+    [
+      "-target",
+      targetTriple,
+      "-O",
+      "-swift-version",
+      "6",
+      "-parse-as-library",
+      "-lz",
+      "-framework",
+      "AppKit",
+      "-framework",
+      "SwiftUI",
+      "-framework",
+      "CryptoKit",
+      "-framework",
+      "CoreImage",
+      "-framework",
+      "Security",
+      "-o",
+      outputPath,
+      ...swiftFiles,
+    ],
+    { cwd: rootDir, stdio: "inherit" },
+  );
+}
+
 console.log("1. Generating native SF Symbol squircle PNG icons...");
 execFileSync("swift", [join(rootDir, "scripts/generate-icons.swift")], {
   cwd: rootDir,
   stdio: "inherit",
 });
 
-console.log("\n2. Compiling pure native SwiftUI + AppKit DevKit Studio (tinycast-devkit)...");
+console.log(`\n2. Compiling pure native SwiftUI + AppKit DevKit Studio (${universalBuild ? "Universal arm64 + x86_64" : process.arch}, macOS 15.0+)...`);
 mkdirSync(buildTmpDir, { recursive: true });
 const swiftFiles = readdirSync(swiftSourceDir)
   .filter((f) => f.endsWith(".swift"))
   .sort()
   .map((f) => join(swiftSourceDir, f));
 
-execFileSync(
-  "swiftc",
-  [
-    "-O",
-    "-swift-version",
-    "6",
-    "-parse-as-library",
-    "-lz",
-    "-framework",
-    "AppKit",
-    "-framework",
-    "SwiftUI",
-    "-framework",
-    "CryptoKit",
-    "-framework",
-    "CoreImage",
-    "-framework",
-    "Security",
-    "-o",
-    compiledBinaryPath,
-    ...swiftFiles,
-  ],
-  { cwd: rootDir, stdio: "inherit" },
-);
+if (universalBuild) {
+  const armPath = join(buildTmpDir, "tinycast-devkit-arm64");
+  const x64Path = join(buildTmpDir, "tinycast-devkit-x86_64");
+  compileSwiftSlice("arm64-apple-macos15.0", armPath, swiftFiles);
+  compileSwiftSlice("x86_64-apple-macos15.0", x64Path, swiftFiles);
+  execFileSync("lipo", ["-create", armPath, x64Path, "-output", compiledBinaryPath], { stdio: "inherit" });
+} else {
+  const triple = process.arch === "x64" ? "x86_64-apple-macos15.0" : "arm64-apple-macos15.0";
+  compileSwiftSlice(triple, compiledBinaryPath, swiftFiles);
+}
+
+execFileSync("codesign", ["--force", "--sign", "-", compiledBinaryPath], { stdio: "inherit" });
 chmodSync(compiledBinaryPath, 0o755);
+const archSummary = execFileSync("lipo", ["-archs", compiledBinaryPath], { encoding: "utf8" }).trim();
 const binMb = (statSync(compiledBinaryPath).size / (1024 * 1024)).toFixed(2);
-console.log(`   ✓ tinycast-devkit (${binMb} MB, arm64 native Mach-O)`);
+console.log(`   ✓ tinycast-devkit (${binMb} MB, archs: ${archSummary})`);
 
 const extensionNames = ["tiny-devkit", "tiny-shortcuts"];
 
