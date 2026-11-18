@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@raycast/api": "^2.8.2",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.0.0",
     "esbuild": "^0.25.0",
     "react": "^19.0.0",
