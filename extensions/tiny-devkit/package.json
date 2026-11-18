@@ -1,0 +1,160 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "tiny-devkit",
+  "title": "DevKit 开发者工具箱",
+  "description": "UUID 全版本生成与解析、时间戳多时区转换、通用 Hash/HMAC/文件校验、多种算法编解码、AES 加解密与 JSON 工具（纯原生悬浮工作台）",
+  "icon": "devkit.png",
+  "author": "tinycast-extensions",
+  "license": "MIT",
+  "categories": ["Developer Tools"],
+  "platforms": ["macOS"],
+  "preferences": [
+    {
+      "name": "uuidDefaultFormat",
+      "type": "dropdown",
+      "required": false,
+      "title": "UUID 默认输出格式",
+      "description": "快速生成 UUID 时的默认格式",
+      "default": "standard",
+      "data": [
+        { "title": "标准小写 (8-4-4-4-12)", "value": "standard" },
+        { "title": "标准大写 (UPPERCASE)", "value": "uppercase" },
+        { "title": "无连字符小写 (Compact)", "value": "compact" },
+        { "title": "无连字符大写 (COMPACT)", "value": "compactUpper" },
+        { "title": "URN (urn:uuid:...)", "value": "urn" }
+      ]
+    },
+    {
+      "name": "quickTimestampUnit",
+      "type": "dropdown",
+      "required": false,
+      "title": "快速复制时间戳默认单位",
+      "description": "运行「快速复制当前时间戳」无视图命令时的默认单位",
+      "default": "s",
+      "data": [
+        { "title": "Unix 秒 (10位)", "value": "s" },
+        { "title": "Unix 毫秒 (13位)", "value": "ms" },
+        { "title": "ISO 8601 UTC", "value": "iso" }
+      ]
+    },
+    {
+      "name": "extraTimezones",
+      "type": "textfield",
+      "required": false,
+      "title": "额外关注时区 (逗号分隔)",
+      "description": "如: Asia/Hong_Kong, Europe/Paris, Australia/Sydney",
+      "placeholder": "Asia/Hong_Kong, Europe/Paris",
+      "default": ""
+    }
+  ],
+  "commands": [
+    {
+      "name": "workbench",
+      "title": "DevKit 原生多工具工作台",
+      "subtitle": "同窗侧边栏 · 自由交互 · 实时计算",
+      "description": "启动纯原生 SwiftUI + AppKit 独立悬浮开发者工作台，集成 UUID、时间戳、Hash、编解码、JSON、密码、二维码、Cron 与网络工具",
+      "mode": "no-view",
+      "icon": "devkit.png",
+      "keywords": ["workbench", "studio", "interactive", "codec", "hash", "uuid", "timestamp", "aes", "工作台", "交互", "计算"]
+    },
+    {
+      "name": "uuid-generator",
+      "title": "UUID 与 ID 生成器",
+      "subtitle": "v1 / v3 / v4 / v5 / v6 / v7 / v8 / ULID / NanoID",
+      "description": "在原生悬浮工作台中生成各版本 RFC 9562 UUID 与现代排序 ID，支持批量生成、格式切换与完整结构解析",
+      "mode": "no-view",
+      "icon": "cmd-uuid.png",
+      "keywords": ["uuid", "guid", "v1", "v3", "v4", "v5", "v6", "v7", "v8", "ulid", "nanoid", "ksuid", "objectid", "生成器", "解析"]
+    },
+    {
+      "name": "timestamp-converter",
+      "title": "时间戳转换",
+      "subtitle": "秒/毫秒/微秒/纳秒 ↔ 日期与多时区",
+      "description": "在原生悬浮工作台中自动识别 Unix 秒/毫秒/微秒/纳秒、ISO 8601、日期选择器与相对表达式，实时时钟与全球时区",
+      "mode": "no-view",
+      "icon": "cmd-timestamp.png",
+      "keywords": ["timestamp", "unix", "epoch", "date", "time", "timezone", "iso", "时间戳", "转换", "时区", "日期"]
+    },
+    {
+      "name": "hash-generator",
+      "title": "Hash 与文件校验",
+      "subtitle": "MD5 / SHA / SHA3 / BLAKE3 / SM3 / HMAC / CRC32",
+      "description": "在原生悬浮工作台中计算文本、Hex/Base64 字节或本地大文件的多种 Hash、HMAC 摘要与校验比对",
+      "mode": "no-view",
+      "icon": "cmd-hash.png",
+      "keywords": ["hash", "md5", "sha1", "sha256", "sha512", "sha3", "keccak", "blake2", "blake3", "sm3", "hmac", "crc32", "murmur", "校验", "哈希"]
+    },
+    {
+      "name": "encode-decode",
+      "title": "算法编解码 & 加解密",
+      "subtitle": "Base64 / Hex / URL / JWT / Gzip / AES",
+      "description": "在原生悬浮工作台中双向转换 Base64、Base32、Base58、Hex、URL、HTML、Unicode、Gzip、JWT 验签与 AES-256",
+      "mode": "no-view",
+      "icon": "cmd-codec.png",
+      "keywords": ["encode", "decode", "base64", "base32", "base58", "hex", "url", "html", "unicode", "jwt", "gzip", "aes", "rot13", "morse", "编码", "解码", "解密"]
+    },
+    {
+      "name": "json-formatter",
+      "title": "JSON 格式化与转换",
+      "subtitle": "美化 / 压缩 / 修复 / YAML / TypeScript",
+      "description": "在原生悬浮工作台中格式化、压缩、键排序与容错修复 JSON，支持转换为 TypeScript 接口、YAML 与 Query 参数",
+      "mode": "no-view",
+      "icon": "cmd-json.png",
+      "keywords": ["json", "format", "minify", "yaml", "typescript", "pretty", "repair", "格式化", "压缩"]
+    },
+    {
+      "name": "color-converter",
+      "title": "色值转换与屏幕取色",
+      "subtitle": "Hex / RGB / HSL / OKLCH / WCAG / 吸管取色",
+      "description": "在原生悬浮工作台中互转全格式色值，使用系统屏幕取色吸管、检测 WCAG 对比度、生成 Tailwind 色阶与配色方案",
+      "mode": "no-view",
+      "icon": "cmd-color.png",
+      "keywords": ["color", "hex", "rgb", "hsl", "oklch", "wcag", "contrast", "eyedropper", "picker", "tailwind", "颜色", "色值", "取色", "对比度"]
+    },
+    {
+      "name": "quick-uuid-v4",
+      "title": "快速生成 UUID v4",
+      "subtitle": "直接复制并提示",
+      "description": "无视图快捷入口：立即生成 UUID v4 并复制到剪贴板",
+      "mode": "no-view",
+      "icon": "cmd-uuid.png",
+      "keywords": ["uuid", "v4", "quick", "copy", "快速", "随机"],
+      "arguments": [
+        { "name": "count", "type": "text", "placeholder": "Count", "required": false }
+      ]
+    },
+    {
+      "name": "quick-uuid-v7",
+      "title": "快速生成 UUID v7",
+      "subtitle": "时序有序 · 直接复制",
+      "description": "无视图快捷入口：立即生成按时间排序的 UUID v7 并复制到剪贴板",
+      "mode": "no-view",
+      "icon": "cmd-uuid.png",
+      "keywords": ["uuid", "v7", "ulid", "quick", "有序", "快速"],
+      "arguments": [
+        { "name": "count", "type": "text", "placeholder": "Count", "required": false }
+      ]
+    },
+    {
+      "name": "quick-timestamp",
+      "title": "快速复制当前时间戳",
+      "subtitle": "秒 / 毫秒一键复制",
+      "description": "无视图快捷入口：立即复制当前 Unix 时间戳并弹出 HUD 提示",
+      "mode": "no-view",
+      "icon": "cmd-timestamp.png",
+      "keywords": ["timestamp", "unix", "now", "quick", "时间戳", "复制"],
+      "arguments": [
+        { "name": "unit", "type": "text", "placeholder": "s/ms", "required": false }
+      ]
+    },
+    {
+      "name": "devkit-menubar",
+      "title": "DevKit 菜单栏工具",
+      "subtitle": "常驻菜单栏快捷复制入口",
+      "description": "在 macOS 菜单栏提供 UUID、时间戳生成与唤起原生悬浮工具台快捷入口",
+      "mode": "menu-bar",
+      "icon": "devkit.png",
+      "keywords": ["menubar", "devkit", "toolbox", "菜单栏", "快捷"]
+    }
+  ]
+}

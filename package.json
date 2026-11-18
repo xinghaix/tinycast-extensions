@@ -1,0 +1,25 @@
+{
+  "name": "tinycast-extensions",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test packages/shared/test/*.test.ts",
+    "verify": "node scripts/verify-tinycast.mjs",
+    "install-local": "node scripts/install-local.mjs"
+  },
+  "devDependencies": {
+    "@raycast/api": "^2.8.2",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "esbuild": "^0.25.0",
+    "react": "^19.0.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.7.1",
+    "qrcode-generator": "^1.4.4"
+  }
+}

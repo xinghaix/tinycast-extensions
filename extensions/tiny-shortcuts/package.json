@@ -1,0 +1,131 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "tiny-shortcuts",
+  "title": "Quick Shortcuts 效率快捷入口",
+  "description": "安全密码与密钥生成、选中文本格式变换、离线矢量二维码、Cron 调度解析、本机 IP 与端口管理、剪贴板智能转换与 Finder 快捷入口",
+  "icon": "shortcuts.png",
+  "author": "tinycast-extensions",
+  "license": "MIT",
+  "categories": ["Productivity", "Developer Tools", "System"],
+  "platforms": ["macOS"],
+  "preferences": [
+    {
+      "name": "defaultPasswordLength",
+      "type": "textfield",
+      "required": false,
+      "title": "快速密码默认长度",
+      "description": "运行「快速生成强密码」时的默认字符长度 (8–128)",
+      "placeholder": "20",
+      "default": "20"
+    },
+    {
+      "name": "terminalApp",
+      "type": "dropdown",
+      "required": false,
+      "title": "默认打开终端应用",
+      "description": "「在终端打开 Finder 目录」使用的终端程序",
+      "default": "Terminal",
+      "data": [
+        { "title": "macOS 终端 (Terminal)", "value": "Terminal" },
+        { "title": "iTerm", "value": "iTerm" },
+        { "title": "Ghostty", "value": "Ghostty" },
+        { "title": "Warp", "value": "Warp" },
+        { "title": "Kitty", "value": "kitty" },
+        { "title": "WezTerm", "value": "WezTerm" }
+      ]
+    },
+    {
+      "name": "qrSaveDir",
+      "type": "directory",
+      "required": false,
+      "title": "二维码保存目录",
+      "description": "保存二维码文件的默认目录（留空则保存到桌面 ~/Desktop）"
+    }
+  ],
+  "commands": [
+    {
+      "name": "password-generator",
+      "title": "密码与密钥生成器",
+      "subtitle": "强密码 / 助记词 / API Token / AES 密钥",
+      "description": "在原生悬浮工作台中定制长度/字符集生成密码、Diceware 助记词、API Token 与加密密钥",
+      "mode": "no-view",
+      "icon": "cmd-password.png",
+      "keywords": ["password", "secret", "token", "key", "passphrase", "pin", "密码", "密钥", "生成器"]
+    },
+    {
+      "name": "quick-password",
+      "title": "快速生成强密码",
+      "subtitle": "隐私复制 · 不记录剪贴板历史",
+      "description": "无视图快捷入口：立即生成高强度随机密码并隐私复制",
+      "mode": "no-view",
+      "icon": "cmd-password.png",
+      "keywords": ["password", "pw", "quick", "random", "密码", "快速"],
+      "arguments": [
+        { "name": "length", "type": "text", "placeholder": "Len", "required": false }
+      ]
+    },
+    {
+      "name": "text-transform",
+      "title": "文本格式与行处理",
+      "subtitle": "命名规范转换 / 去重排序 / 字数统计",
+      "description": "自动读取当前选中文本或剪贴板，在原生悬浮工作台进行 camelCase / snake_case / 行批处理与字数统计",
+      "mode": "no-view",
+      "icon": "cmd-text.png",
+      "keywords": ["text", "case", "camel", "snake", "kebab", "sort", "dedupe", "count", "文本", "大小写", "去重"]
+    },
+    {
+      "name": "qr-generator",
+      "title": "离线二维码生成器",
+      "subtitle": "原生预览 · Wi-Fi 助手 · 导出 SVG/PNG",
+      "description": "在原生悬浮工作台离线生成清晰二维码，支持 Wi-Fi 配置并一键导出矢量 SVG / PNG",
+      "mode": "no-view",
+      "icon": "cmd-qr.png",
+      "keywords": ["qr", "qrcode", "barcode", "svg", "png", "wifi", "url", "二维码"]
+    },
+    {
+      "name": "cron-inspector",
+      "title": "Cron 表达式解析",
+      "subtitle": "语义解释 + 未来 10 次触发时间",
+      "description": "在原生悬浮工作台解析 5 段或 6 段 Cron 表达式及常用宏，展示中文语义与执行预测",
+      "mode": "no-view",
+      "icon": "cmd-cron.png",
+      "keywords": ["cron", "crontab", "schedule", "timer", "定时", "表达式"]
+    },
+    {
+      "name": "network-ports",
+      "title": "本机 IP 与监听端口管理",
+      "subtitle": "网卡 IP / 公网 IP / TCP 端口与进程终止",
+      "description": "在原生悬浮工作台查看本地网卡 IPv4/IPv6、按需查询公网 IP，以及监控与终止监听端口进程",
+      "mode": "no-view",
+      "icon": "cmd-network.png",
+      "keywords": ["ip", "port", "lsof", "tcp", "listen", "kill", "network", "端口", "网络"]
+    },
+    {
+      "name": "smart-clipboard",
+      "title": "剪贴板智能转换",
+      "subtitle": "自动识别时间戳 / JWT / JSON / Base64 / UUID",
+      "description": "在原生悬浮工作台一键读取剪贴板并智能提供解析、转换、Hash 与编码操作",
+      "mode": "no-view",
+      "icon": "cmd-clipboard.png",
+      "keywords": ["clipboard", "smart", "inspect", "auto", "剪贴板", "智能", "转换"]
+    },
+    {
+      "name": "open-in-terminal",
+      "title": "在终端打开 Finder 目录",
+      "subtitle": "直达当前 Finder 窗口或选中文件夹",
+      "description": "无视图快捷入口：获取 Finder 当前目录或选中文件所在目录并在终端中打开",
+      "mode": "no-view",
+      "icon": "cmd-terminal.png",
+      "keywords": ["finder", "terminal", "iterm", "ghostty", "cd", "终端", "打开"]
+    },
+    {
+      "name": "copy-finder-path",
+      "title": "复制 Finder 选中路径",
+      "subtitle": "POSIX 路径一键复制",
+      "description": "无视图快捷入口：复制 Finder 当前选中项目或当前窗口目录的 POSIX 路径",
+      "mode": "no-view",
+      "icon": "cmd-finder.png",
+      "keywords": ["finder", "path", "copy", "posix", "路径", "复制"]
+    }
+  ]
+}

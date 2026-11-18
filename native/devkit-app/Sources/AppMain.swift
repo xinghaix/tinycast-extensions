@@ -1,0 +1,701 @@
+import AppKit
+import CryptoKit
+import Darwin
+import Foundation
+import SwiftUI
+
+// MARK: - Single Instance & Atomic Flock IPC
+
+private struct InstanceLock: Codable {
+    let pid: Int32
+    let binarySha256: String
+}
+
+private struct OpenRequest: Codable {
+    let requestId: String
+    let timestamp: Double
+    let tool: String?
+    let selectedB64: String?
+}
+
+private let kOpenNotification = Notification.Name("com.tinycast.devkit.open")
+
+// Disambiguate POSIX flock(2) from C `struct flock` imported by Darwin.
+@_silgen_name("flock")
+private func c_flock(_ fd: Int32, _ operation: Int32) -> Int32
+
+// Kept open for the lifetime of the master process; the kernel releases LOCK_EX atomically on exit.
+nonisolated(unsafe) private var gHeldLockFD: Int32 = -1
+
+private func lockFilePath() -> String {
+    "/tmp/tinycast-devkit-\(getuid()).lock"
+}
+
+private func requestFileURL() -> URL {
+    URL(fileURLWithPath: "/tmp/tinycast-devkit-\(getuid())-request.json")
+}
+
+private func currentExecutableSha256() -> String {
+    let rawPath = Bundle.main.executablePath
+        ?? CommandLine.arguments.first
+        ?? ProcessInfo.processInfo.arguments.first
+        ?? ""
+    guard !rawPath.isEmpty else { return "" }
+    let resolved = URL(fileURLWithPath: rawPath).resolvingSymlinksInPath()
+    guard let data = try? Data(contentsOf: resolved) else { return "" }
+    return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+}
+
+private func writeInstanceLock(_ lock: InstanceLock, to fd: Int32) {
+    guard let data = try? JSONEncoder().encode(lock) else { return }
+    Darwin.ftruncate(fd, 0)
+    var written = 0
+    data.withUnsafeBytes { raw in
+        guard let base = raw.baseAddress else { return }
+        while written < data.count {
+            let n = Darwin.pwrite(fd, base.advanced(by: written), data.count - written, off_t(written))
+            if n <= 0 { break }
+            written += n
+        }
+    }
+    _ = Darwin.fsync(fd)
+}
+
+private func readInstanceLock(from fd: Int32) -> InstanceLock? {
+    var buf = [UInt8](repeating: 0, count: 1024)
+    let n = Darwin.pread(fd, &buf, buf.count, 0)
+    guard n > 0 else { return nil }
+    return try? JSONDecoder().decode(InstanceLock.self, from: Data(buf.prefix(n)))
+}
+
+private func decodeArgValue(_ flag: String, in args: [String]) -> String? {
+    guard let idx = args.firstIndex(of: flag), idx + 1 < args.count else { return nil }
+    return args[idx + 1]
+}
+
+private func decodeBase64Arg(_ flag: String, in args: [String]) -> String? {
+    guard let b64 = decodeArgValue(flag, in: args), !b64.isEmpty,
+          let data = Data(base64Encoded: b64) else { return nil }
+    return String(data: data, encoding: .utf8)
+}
+
+private func normalizeToolArg(_ raw: String?) -> String? {
+    guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !raw.isEmpty else { return nil }
+    switch raw {
+    case "workbench", "smart-clipboard", "smart": return "smart"
+    case "uuid-generator", "uuid": return "uuid"
+    case "timestamp-converter", "timestamp": return "timestamp"
+    case "hash-generator", "hash": return "hash"
+    case "encode-decode", "codec": return "codec"
+    case "json-formatter", "json": return "json"
+    case "color-converter", "color-picker", "color": return "color"
+    case "password-generator", "password": return "password"
+    case "text-transform", "text": return "text"
+    case "qr-generator", "qr": return "qr"
+    case "cron-inspector", "cron": return "cron"
+    case "network-ports", "network": return "network"
+    default: return ToolID(rawValue: raw)?.rawValue
+    }
+}
+
+private func coordinateSingleInstance(tool: String?, selectedB64: String?) -> String {
+    // Clean up legacy non-flock JSON lockfile if present from earlier builds
+    let legacyURL = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("tinycast-devkit-\(getuid()).json")
+    try? FileManager.default.removeItem(at: legacyURL)
+
+    let isLockTest = ProcessInfo.processInfo.environment["TINYCAST_LOCK_TEST"] == "1"
+    let lockPath = isLockTest ? "/tmp/tinycast-devkit-\(getuid())-race-test.lock" : lockFilePath()
+    let reqId = UUID().uuidString
+
+    if !isLockTest {
+        let req = OpenRequest(
+            requestId: reqId,
+            timestamp: Date().timeIntervalSince1970,
+            tool: tool,
+            selectedB64: selectedB64
+        )
+        if let reqData = try? JSONEncoder().encode(req) {
+            try? reqData.write(to: requestFileURL(), options: .atomic)
+        }
+    }
+
+    let fd = Darwin.open(lockPath, O_CREAT | O_RDWR, 0o600)
+    guard fd >= 0 else {
+        return reqId
+    }
+
+    let myHash = isLockTest ? "" : currentExecutableSha256()
+
+    if c_flock(fd, LOCK_EX | LOCK_NB) == 0 {
+        if isLockTest {
+            usleep(180_000)
+            print("LOCK_MASTER")
+            fflush(stdout)
+            exit(0)
+        }
+        gHeldLockFD = fd
+        writeInstanceLock(InstanceLock(pid: getpid(), binarySha256: myHash), to: fd)
+        return reqId
+    }
+
+    if isLockTest {
+        print("LOCK_SECONDARY")
+        fflush(stdout)
+        Darwin.close(fd)
+        exit(0)
+    }
+
+    // Another instance holds LOCK_EX. Inspect whether it is an outdated binary on disk.
+    var existing = readInstanceLock(from: fd)
+    if existing == nil {
+        usleep(15_000)
+        existing = readInstanceLock(from: fd)
+    }
+
+    if let existing,
+       existing.pid > 0,
+       existing.pid != getpid(),
+       !existing.binarySha256.isEmpty,
+       !myHash.isEmpty,
+       existing.binarySha256 != myHash {
+        Darwin.kill(existing.pid, SIGTERM)
+        for _ in 0..<40 {
+            if c_flock(fd, LOCK_EX | LOCK_NB) == 0 {
+                gHeldLockFD = fd
+                writeInstanceLock(InstanceLock(pid: getpid(), binarySha256: myHash), to: fd)
+                return reqId
+            }
+            usleep(25_000)
+        }
+    }
+
+    let info: [String: String] = [
+        "requestId": reqId,
+        "tool": tool ?? "",
+        "selectedB64": selectedB64 ?? "",
+    ]
+    DistributedNotificationCenter.default().postNotificationName(
+        kOpenNotification,
+        object: nil,
+        userInfo: info,
+        deliverImmediately: true
+    )
+    Darwin.close(fd)
+    exit(0)
+}
+
+// MARK: - Self Test Suite
+
+@MainActor
+private func runSelfTests() -> Never {
+    func check(_ cond: @autoclosure () -> Bool, _ msg: String) {
+        if !cond() {
+            fputs("SELF_TEST_FAIL: \(msg)\n", stderr)
+            exit(1)
+        }
+    }
+
+    // 1. UUID RFC 9562 vectors, monotonic batches, KSUID 160-bit round-trip
+    let fixedTs: Int64 = 1_731_830_400_123
+    check(UUIDEngine.shared.generateV3(name: "www.example.com") == "5df41881-3aed-3515-88a7-2f4a814cf09e", "UUID v3 vector")
+    check(UUIDEngine.shared.generateV5(name: "www.example.com") == "2ed6657d-e927-568b-95e1-2665a8aea6a2", "UUID v5 vector")
+
+    let v1 = UUIDEngine.shared.generateV1(timestampMs: fixedTs)
+    let v6 = UUIDEngine.shared.generateV6(timestampMs: fixedTs)
+    let v7 = UUIDEngine.shared.generateV7(timestampMs: fixedTs)
+    check(UUIDEngine.shared.inspect(v1)?.timestampMs == fixedTs, "v1 timestamp extract")
+    check(UUIDEngine.shared.inspect(v6)?.timestampMs == fixedTs, "v6 timestamp extract")
+    check(UUIDEngine.shared.inspect(v7)?.timestampMs == fixedTs, "v7 timestamp extract")
+
+    let v7Batch = (0..<20).map { _ in UUIDEngine.shared.generateV7() }
+    for i in 1..<v7Batch.count { check(v7Batch[i] > v7Batch[i - 1], "v7 monotonic batch") }
+    let ulidBatch = (0..<20).map { _ in UUIDEngine.shared.generateUlid() }
+    for i in 1..<ulidBatch.count { check(ulidBatch[i] > ulidBatch[i - 1], "ULID monotonic batch") }
+
+    let ksuid = UUIDEngine.shared.generateKsuid(timestampMs: 1_731_830_400_000)
+    check(ksuid.count == 27, "KSUID length")
+    check(UUIDEngine.shared.inspect(ksuid)?.timestampMs == 1_731_830_400_000, "KSUID timestamp round-trip")
+
+    let oid = UUIDEngine.shared.generateObjectId(timestampMs: 1_731_830_400_000)
+    check(oid.count == 24 && UUIDEngine.shared.inspect(oid)?.timestampMs == 1_731_830_400_000, "ObjectID round-trip")
+
+    // 2. Hash vectors (SHA-256, SM3, SHA3-256, BLAKE3 single + multi-chunk, CRC32)
+    let abcHashes = HashEngine.computeAll(data: Data("abc".utf8))
+    let findHash: (String) -> String? = { id in abcHashes.first(where: { $0.id == id })?.hexLower }
+    check(findHash("sha256") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA-256 abc")
+    check(findHash("sm3") == "66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0", "SM3 abc")
+    check(findHash("sha3-256") == "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532", "SHA3-256 abc")
+    check(findHash("blake3") == "6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85", "BLAKE3 abc")
+    check(findHash("crc32") == "352441c2", "CRC32 abc")
+    check(HashEngine.blake3(Data(repeating: 0x41, count: 4096)).count == 32, "BLAKE3 multi-chunk")
+
+    // 3. Codecs, Zlib, JWT, AES-GCM & CBC
+    let sample = "你好 Tinycast 🚀 & <test>"
+    check(CodecEngine.decodeBase32(CodecEngine.encodeBase32(Data(sample.utf8))).flatMap { String(data: $0, encoding: .utf8) } == sample, "Base32 round-trip")
+    check(CodecEngine.decodeBase58(CodecEngine.encodeBase58(Data(sample.utf8))).flatMap { String(data: $0, encoding: .utf8) } == sample, "Base58 round-trip")
+    let gzB64 = try! CodecEngine.runBidirectional(sample, op: .gzip, encode: true)
+    check((try? CodecEngine.runBidirectional(gzB64, op: .gzip, encode: false)) == sample, "Gzip round-trip")
+    let ctGcm = try! CodecEngine.encryptAes(sample, secret: "strong-pass", mode: .gcm, kdf: .pbkdf2)
+    check((try? CodecEngine.decryptAes(ctGcm, secret: "strong-pass")) == sample, "AES-256-GCM round-trip")
+    let ctCbc = try! CodecEngine.encryptAes(sample, secret: "strong-pass", mode: .cbc, kdf: .pbkdf2)
+    check((try? CodecEngine.decryptAes(ctCbc, secret: "strong-pass")) == sample, "AES-256-CBC round-trip")
+
+    // 4. Timestamp, JSON repair, Cron, QR
+    check(TimestampEngine.parse("1731830400")?.detectedKind.contains("秒") == true, "Timestamp parse")
+    let jsonAnalysis = JsonEngine.analyze("{ /* note */ app: 'Tinycast', list: [1, 2,], }")
+    check(jsonAnalysis.valid && jsonAnalysis.repaired, "JSON repair")
+    let cron = try! CronEngine.parse("*/15 9-17 * * 1-5", count: 5)
+    check(cron.nextRuns.count == 5, "Cron nextRuns")
+    let qr = QrEngine.generate(text: "https://github.com/abue-ammar/tinycast", level: .M)
+    check(qr != nil && qr!.svg.hasPrefix("<svg"), "QR generation")
+
+    // 5. Color parsing, conversions, WCAG, OKLCH shades, harmonies, CVD & smart routing
+    check(ColorEngine.parse("#3B82F6")?.hex6Lower == "#3b82f6", "Color hex 6")
+    check(ColorEngine.parse("#f0a")?.hex6Lower == "#ff00aa", "Color hex 3")
+    check(ColorEngine.parse("20261118") == nil, "Plain digits without # must not misparse as hex color")
+    check(ColorEngine.parse("rebeccapurple")?.hex6Lower == "#663399", "CSS named color")
+    check(ColorEngine.parse("rgb(59 130 246 / 50%)")?.a255 == 128, "CSS4 rgb alpha")
+    check(ColorEngine.parse("Color(0xFF3B82F6)")?.hex6Lower == "#3b82f6", "Android/Flutter 0xAARRGGBB")
+    if let blue = ColorEngine.parse("#3B82F6"), let backOk = ColorEngine.parse(ColorEngine.formatAll(blue).first(where: { $0.id == "oklch" })?.value ?? "") {
+        check(abs(blue.r - backOk.r) < 0.01 && abs(blue.g - backOk.g) < 0.01 && abs(blue.b - backOk.b) < 0.01, "OKLCH round-trip")
+    } else {
+        check(false, "OKLCH format parse")
+    }
+    let wcagBw = ColorEngine.evaluateContrast(foreground: ColorRGBA(r: 0, g: 0, b: 0), background: ColorRGBA(r: 1, g: 1, b: 1))
+    check(abs(wcagBw.ratio - 21.0) < 0.05 && wcagBw.aaaNormal, "WCAG 21:1 B/W")
+    let fixed = ColorEngine.autoFixForContrast(foreground: ColorRGBA(r: 0.7, g: 0.7, b: 0.7), background: ColorRGBA(r: 1, g: 1, b: 1), targetRatio: 4.5)
+    check(ColorEngine.evaluateContrast(foreground: fixed, background: ColorRGBA(r: 1, g: 1, b: 1)).aaNormal, "WCAG autoFixForContrast")
+    check(ColorEngine.tailwindScale(for: ColorRGBA(r: 0.231, g: 0.510, b: 0.965)).count == 11, "Tailwind 11 shades")
+    check(ColorEngine.harmonies(for: ColorRGBA(r: 0.231, g: 0.510, b: 0.965)).count == 5, "Color harmonies")
+    check(ColorEngine.simulateCvd(ColorRGBA(r: 0.231, g: 0.510, b: 0.965)).count == 5, "CVD simulations")
+    check(SmartDetector.detect("#3B82F6") == .color, "SmartDetector color")
+
+    // 6. All ToolID tabs + jump routing
+    let studio = StudioState()
+    for tool in ToolID.allCases {
+        studio.jump(to: tool, searchTerm: tool == .hash ? "md5" : (tool == .codec ? "jwt" : ""))
+        check(studio.activeTool == tool, "Switch tool \(tool.rawValue)")
+    }
+    studio.applyLaunch(toolRaw: "color", handoffSelected: nil, clipboardText: "#10B981")
+    check(studio.colorInput == "#10B981", "Launch clipboard handoff to color")
+    check(studio.hashFilterHint == "md5", "Hash search hint propagation")
+    check(studio.codecTabHint == .jwt, "JWT subtab routing")
+
+    print("SELF_TEST_OK")
+    exit(0)
+}
+
+// MARK: - Studio Shell Views
+
+struct VisualEffectBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
+
+struct StudioRootView: View {
+    @Environment(StudioState.self) private var studio
+    @FocusState private var searchFocused: Bool
+
+    var body: some View {
+        @Bindable var studio = studio
+
+        ZStack(alignment: .bottom) {
+            HStack(spacing: 0) {
+                sidebarView
+                    .frame(width: 218)
+
+                Divider()
+
+                detailView
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(nsColor: .windowBackgroundColor).opacity(0.65))
+            }
+
+            if let toast = studio.toastText {
+                Text(toast)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(studio.toastIsError ? Color.red.opacity(0.92) : Color(nsColor: .controlAccentColor).opacity(0.95))
+                            .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
+                    )
+                    .foregroundStyle(.white)
+                    .padding(.bottom, 16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: studio.toastText)
+        .background(VisualEffectBackground().ignoresSafeArea())
+        .onAppear {
+            studio.onFocusSearch = { searchFocused = true }
+        }
+    }
+
+    private var sidebarView: some View {
+        @Bindable var studio = studio
+        let visibleTools = studio.filteredTools()
+
+        return VStack(spacing: 10) {
+            HStack {
+                Spacer().frame(width: 68)
+                Spacer()
+                Button {
+                    let clip = ClipboardService.readString()
+                    if clip.isEmpty {
+                        studio.showToast("剪贴板为空", isError: true)
+                    } else {
+                        studio.applyLaunch(toolRaw: studio.activeTool.rawValue, handoffSelected: nil, clipboardText: clip)
+                        studio.showToast("已将剪贴板内容载入当前工具")
+                    }
+                } label: {
+                    Image(systemName: "clipboard")
+                        .font(.system(size: 12, weight: .medium))
+                        .frame(width: 26, height: 24)
+                }
+                .buttonStyle(.borderless)
+                .help("从剪贴板载入到当前工具")
+
+                Button {
+                    studio.isPinnedOnTop.toggle()
+                    studio.onPinChange?(studio.isPinnedOnTop)
+                    studio.showToast(studio.isPinnedOnTop ? "已置顶悬浮" : "已取消置顶")
+                } label: {
+                    Image(systemName: studio.isPinnedOnTop ? "pin.fill" : "pin")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(studio.isPinnedOnTop ? Color.accentColor : Color.secondary)
+                        .frame(width: 26, height: 24)
+                }
+                .buttonStyle(.borderless)
+                .help("置顶窗口 (Float on Top)")
+            }
+            .padding(.top, 10)
+            .padding(.horizontal, 10)
+
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                TextField("搜索工具或算法 (⌘F)…", text: $studio.sidebarSearch)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                    .focused($searchFocused)
+                    .onSubmit {
+                        if let first = visibleTools.first {
+                            studio.jump(to: first, searchTerm: studio.sidebarSearch)
+                        }
+                    }
+                if !studio.sidebarSearch.isEmpty {
+                    Button {
+                        studio.sidebarSearch = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.primary.opacity(0.06)))
+            .padding(.horizontal, 10)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(ToolGroup.allCases, id: \.rawValue) { group in
+                        let items = visibleTools.filter { $0.group == group }
+                        if !items.isEmpty {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(group.rawValue)
+                                    .font(.system(size: 10.5, weight: .semibold))
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.horizontal, 10)
+
+                                ForEach(items) { tool in
+                                    SidebarToolButton(
+                                        tool: tool,
+                                        selected: studio.activeTool == tool,
+                                        action: {
+                                            studio.jump(to: tool, searchTerm: studio.sidebarSearch)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 12)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var detailView: some View {
+        switch studio.activeTool {
+        case .smart: SmartClipboardView()
+        case .uuid: UuidToolView()
+        case .timestamp: TimestampToolView()
+        case .hash: HashToolView()
+        case .codec: CodecToolView()
+        case .json: JsonToolView()
+        case .color: ColorToolView()
+        case .password: PasswordToolView()
+        case .text: TextToolView()
+        case .qr: QrToolView()
+        case .cron: CronToolView()
+        case .network: NetworkToolView()
+        }
+    }
+}
+
+private struct SidebarToolButton: View {
+    let tool: ToolID
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: tool.sfSymbol)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(selected ? .white : tool.accentColor)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(selected ? tool.accentColor : tool.accentColor.opacity(0.14))
+                    )
+                Text(tool.title)
+                    .font(.system(size: 12.5, weight: selected ? .semibold : .medium))
+                    .foregroundStyle(selected ? .primary : .secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(selected ? Color.primary.opacity(0.11) : (hovered ? Color.primary.opacity(0.05) : .clear))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+    }
+}
+
+// MARK: - AppDelegate & Menu Setup
+
+@MainActor
+final class StudioAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    let studio = StudioState()
+    var window: NSWindow!
+    var initialRequestId: String = ""
+    private var lastHandledRequestId: String = ""
+    private var lastActiveAt: Date = Date()
+    private var idleTimer: Timer?
+    private var activityMonitor: Any?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        lastHandledRequestId = initialRequestId
+
+        // Register IPC observer before constructing views/windows so rapid second clicks are never missed.
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleOpenNotification(_:)),
+            name: kOpenNotification,
+            object: nil,
+            suspensionBehavior: .deliverImmediately
+        )
+
+        NSApp.setActivationPolicy(.accessory)
+        buildMainMenu()
+
+        let args = CommandLine.arguments
+        let initialTool = normalizeToolArg(decodeArgValue("--tool", in: args))
+        let initialSelected = decodeBase64Arg("--selected", in: args) ?? decodeArgValue("--selected-text", in: args)
+        let clip = ClipboardService.readString()
+        studio.applyLaunch(toolRaw: initialTool, handoffSelected: initialSelected, clipboardText: clip)
+
+        let rootView = StudioRootView().environment(studio)
+        let hosting = NSHostingController(rootView: rootView)
+
+        let win = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1060, height: 700),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        win.title = "Tinycast DevKit Studio"
+        win.titleVisibility = .hidden
+        win.titlebarAppearsTransparent = true
+        win.isMovableByWindowBackground = true
+        win.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        win.minSize = NSSize(width: 840, height: 540)
+        win.isOpaque = false
+        win.backgroundColor = .clear
+        win.contentViewController = hosting
+        win.delegate = self
+        win.center()
+        self.window = win
+
+        studio.onPinChange = { [weak win] pinned in
+            win?.level = pinned ? .floating : .normal
+        }
+
+        activityMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown, .scrollWheel]) { [weak self] ev in
+            self?.lastActiveAt = Date()
+            return ev
+        }
+
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                let idleSeconds = Date().timeIntervalSince(self.lastActiveAt)
+                if !self.studio.isPinnedOnTop && !NSApp.isActive && idleSeconds > 600 {
+                    NSApp.terminate(nil)
+                }
+            }
+        }
+
+        applyPendingDiskRequestIfNewer()
+        summonWindow()
+    }
+
+    @objc private func handleOpenNotification(_ note: Notification) {
+        lastActiveAt = Date()
+        let info = note.userInfo ?? [:]
+        var reqId = (info["requestId"] as? String) ?? ""
+        var toolRaw = info["tool"] as? String
+        var selectedB64 = info["selectedB64"] as? String
+
+        if reqId.isEmpty,
+           let data = try? Data(contentsOf: requestFileURL()),
+           let req = try? JSONDecoder().decode(OpenRequest.self, from: data) {
+            reqId = req.requestId
+            if toolRaw == nil || toolRaw?.isEmpty == true { toolRaw = req.tool }
+            if selectedB64 == nil || selectedB64?.isEmpty == true { selectedB64 = req.selectedB64 }
+        }
+
+        if !reqId.isEmpty && reqId == lastHandledRequestId {
+            summonWindow()
+            return
+        }
+        if !reqId.isEmpty { lastHandledRequestId = reqId }
+
+        let tool = normalizeToolArg(toolRaw)
+        let selected = (selectedB64?.isEmpty == false)
+            ? Data(base64Encoded: selectedB64!).flatMap { String(data: $0, encoding: .utf8) }
+            : nil
+        let clip = ClipboardService.readString()
+        studio.applyLaunch(toolRaw: tool, handoffSelected: selected, clipboardText: clip)
+        summonWindow()
+    }
+
+    private func applyPendingDiskRequestIfNewer() {
+        guard let data = try? Data(contentsOf: requestFileURL()),
+              let req = try? JSONDecoder().decode(OpenRequest.self, from: data),
+              Date().timeIntervalSince1970 - req.timestamp < 3.0,
+              req.requestId != lastHandledRequestId else {
+            return
+        }
+        lastHandledRequestId = req.requestId
+        let tool = normalizeToolArg(req.tool)
+        let selected = req.selectedB64.flatMap { !$0.isEmpty ? Data(base64Encoded: $0) : nil }
+            .flatMap { String(data: $0, encoding: .utf8) }
+        let clip = ClipboardService.readString()
+        studio.applyLaunch(toolRaw: tool, handoffSelected: selected, clipboardText: clip)
+    }
+
+    private func summonWindow() {
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        NSRunningApplication.current.activate(options: [.activateAllWindows])
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        lastActiveAt = Date()
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Do NOT delete the .lock file — the kernel releases flock() automatically on process exit.
+        if let activityMonitor { NSEvent.removeMonitor(activityMonitor) }
+        idleTimer?.invalidate()
+    }
+
+    @objc private func focusSearchAction() {
+        studio.onFocusSearch?()
+    }
+
+    private func buildMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appItem = NSMenuItem()
+        let appMenu = NSMenu(title: "Tinycast DevKit")
+        appMenu.addItem(withTitle: "关闭窗口", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        appMenu.addItem(NSMenuItem.separator())
+        appMenu.addItem(withTitle: "退出 DevKit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appItem.submenu = appMenu
+        mainMenu.addItem(appItem)
+
+        let editItem = NSMenuItem()
+        let editMenu = NSMenu(title: "编辑")
+        editMenu.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "重做", action: Selector(("redo:")), keyEquivalent: "Z")
+        editMenu.addItem(NSMenuItem.separator())
+        editMenu.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "复制", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenu.addItem(NSMenuItem.separator())
+        let findItem = NSMenuItem(title: "聚焦侧边栏搜索", action: #selector(focusSearchAction), keyEquivalent: "f")
+        findItem.target = self
+        editMenu.addItem(findItem)
+        editItem.submenu = editMenu
+        mainMenu.addItem(editItem)
+
+        NSApp.mainMenu = mainMenu
+    }
+}
+
+// MARK: - Program Entry Point
+
+@main
+@MainActor
+struct DevKitStudioMain {
+    static func main() {
+        if ProcessInfo.processInfo.environment["TINYCAST_STUDIO_DRY_RUN"] == "1" {
+            exit(0)
+        }
+        let args = CommandLine.arguments
+        if args.contains("--self-test") {
+            runSelfTests()
+        }
+
+        let tool = normalizeToolArg(decodeArgValue("--tool", in: args))
+        let selectedB64 = decodeArgValue("--selected", in: args)
+        let reqId = coordinateSingleInstance(tool: tool, selectedB64: selectedB64)
+
+        let app = NSApplication.shared
+        let delegate = StudioAppDelegate()
+        delegate.initialRequestId = reqId
+        app.delegate = delegate
+        app.run()
+    }
+}
