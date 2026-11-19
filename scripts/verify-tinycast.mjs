@@ -206,8 +206,13 @@ async function verifyNativeBinary(binPath) {
     env: cleanEnv,
     encoding: "utf8",
   }).trim();
-  assert.equal(selfOut, "SELF_TEST_OK", `Unexpected --self-test output: ${selfOut}`);
-  console.log(`  ✓ tinycast-devkit --self-test (${selfOut})`);
+  const selfLastLine = selfOut
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .at(-1);
+  assert.equal(selfLastLine, "SELF_TEST_OK", `Unexpected --self-test output: ${selfOut}`);
+  console.log(`  ✓ tinycast-devkit --self-test (${selfLastLine})`);
 
   await runConcurrentLockTest(binPath);
 }

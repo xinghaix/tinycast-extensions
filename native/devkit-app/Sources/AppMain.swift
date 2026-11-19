@@ -400,7 +400,7 @@ private func runSelfTests() -> Never {
     check(studio.hashFilterHint == "md5", "Hash search hint propagation")
     check(studio.codecTabHint == .jwt, "JWT subtab routing")
 
-    print("SELF_TEST_OK")
+    print("\nSELF_TEST_OK")
     exit(0)
 }
 

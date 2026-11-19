@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import CoreML
+import Darwin
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -53,6 +54,27 @@ enum VisionImageEngine {
         }.value
     }
 
+    static var isVirtualMachine: Bool {
+        var v: Int32 = 0
+        var sz = MemoryLayout<Int32>.size
+        return sysctlbyname("kern.hv_vmm_present", &v, &sz, nil, 0) == 0 && v != 0
+    }
+
+    private static func configureCpuCompute(for request: VNRequest, cpuDevice: MLComputeDevice) {
+        let stageMap = (try? request.supportedComputeStageDevices) ?? [:]
+        if !stageMap.isEmpty {
+            for (stage, devices) in stageMap {
+                let cpuForStage = devices.first(where: {
+                    if case .cpu = $0 { return true }
+                    return false
+                }) ?? cpuDevice
+                request.setComputeDevice(cpuForStage, for: stage)
+            }
+        } else {
+            request.setComputeDevice(cpuDevice, for: .main)
+        }
+    }
+
     static func scanImageDataSync(
         _ data: Data,
         accurate: Bool = true,
@@ -78,8 +100,8 @@ enum VisionImageEngine {
                    if case .cpu = $0 { return true }
                    return false
                }) {
-                textReq.setComputeDevice(cpuDevice, for: .main)
-                barcodeReq.setComputeDevice(cpuDevice, for: .main)
+                configureCpuCompute(for: textReq, cpuDevice: cpuDevice)
+                configureCpuCompute(for: barcodeReq, cpuDevice: cpuDevice)
             }
 
             let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
@@ -96,10 +118,14 @@ enum VisionImageEngine {
 
         let textObs: [VNRecognizedTextObservation]
         let barcodeObs: [VNBarcodeObservation]
-        do {
-            (textObs, barcodeObs) = try perform(cpuOnly: false)
-        } catch {
+        if isVirtualMachine {
             (textObs, barcodeObs) = try perform(cpuOnly: true)
+        } else {
+            do {
+                (textObs, barcodeObs) = try perform(cpuOnly: false)
+            } catch {
+                (textObs, barcodeObs) = try perform(cpuOnly: true)
+            }
         }
 
         // Vision boundingBox origin is bottom-left; sort top-to-bottom, left-to-right.
