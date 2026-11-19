@@ -5,7 +5,8 @@ import SwiftUI
 enum ToolGroup: String, CaseIterable, Sendable {
     case smart = "智能与快捷"
     case core = "核心开发者工具"
-    case utility = "实用效率工具"
+    case data = "数据与安全"
+    case media = "视觉与效率"
 }
 
 enum ToolID: String, CaseIterable, Identifiable, Sendable {
@@ -16,6 +17,16 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
     case codec
     case json
     case color
+    case regex
+    case diff
+    case url
+    case radix
+    case cidr
+    case dataFormat = "data"
+    case sql
+    case cert
+    case ocr
+    case image
     case password
     case text
     case qr
@@ -26,9 +37,14 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
 
     var group: ToolGroup {
         switch self {
-        case .smart: return .smart
-        case .uuid, .timestamp, .hash, .codec, .json, .color: return .core
-        case .password, .text, .qr, .cron, .network: return .utility
+        case .smart:
+            return .smart
+        case .uuid, .timestamp, .hash, .codec, .json, .color, .regex, .diff, .url, .radix, .cidr:
+            return .core
+        case .dataFormat, .sql, .cert:
+            return .data
+        case .ocr, .image, .password, .text, .qr, .cron, .network:
+            return .media
         }
     }
 
@@ -41,11 +57,21 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
         case .codec: return "编解码 & AES"
         case .json: return "JSON 工具"
         case .color: return "色值 & 取色"
+        case .regex: return "Regex 正则"
+        case .diff: return "文本/JSON Diff"
+        case .url: return "URL & cURL"
+        case .radix: return "进制 & 位运算"
+        case .cidr: return "CIDR 子网"
+        case .dataFormat: return "格式互转"
+        case .sql: return "SQL & 日志"
+        case .cert: return "TLS 证书/SSH"
+        case .ocr: return "离线 OCR 识字"
+        case .image: return "图片转换/EXIF"
         case .password: return "密码与密钥"
         case .text: return "文本格式化"
         case .qr: return "二维码生成"
         case .cron: return "Cron 解析"
-        case .network: return "IP & 端口"
+        case .network: return "IP/端口/Hosts"
         }
     }
 
@@ -58,6 +84,16 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
         case .codec: return "chevron.left.forwardslash.chevron.right"
         case .json: return "curlybraces"
         case .color: return "paintpalette"
+        case .regex: return "text.magnifyingglass"
+        case .diff: return "arrow.left.arrow.right.square"
+        case .url: return "link"
+        case .radix: return "number.square"
+        case .cidr: return "point.3.connected.trianglepath.dotted"
+        case .dataFormat: return "tablecells"
+        case .sql: return "cylinder.split.1x2"
+        case .cert: return "checkmark.seal"
+        case .ocr: return "text.viewfinder"
+        case .image: return "photo.on.rectangle.angled"
         case .password: return "key"
         case .text: return "doc.plaintext"
         case .qr: return "qrcode"
@@ -75,6 +111,16 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
         case .codec: return .purple
         case .json: return .cyan
         case .color: return .pink
+        case .regex: return .orange
+        case .diff: return .blue
+        case .url: return .cyan
+        case .radix: return .mint
+        case .cidr: return .teal
+        case .dataFormat: return .indigo
+        case .sql: return .blue
+        case .cert: return .green
+        case .ocr: return .purple
+        case .image: return .pink
         case .password: return .pink
         case .text: return .blue
         case .qr: return .primary
@@ -92,11 +138,21 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
         case .codec: return ["encode", "decode", "base64", "base32", "base58", "hex", "url", "html", "unicode", "jwt", "gzip", "deflate", "aes", "gcm", "cbc", "rot13", "morse", "radix", "编码", "解码", "加解密"]
         case .json: return ["json", "format", "minify", "yaml", "typescript", "pretty", "repair", "query", "格式化"]
         case .color: return ["color", "hex", "rgb", "rgba", "hsl", "hsv", "hsb", "oklch", "oklab", "lab", "lch", "hwb", "cmyk", "wcag", "contrast", "eyedropper", "palette", "tailwind", "色值", "颜色", "取色", "吸管", "对比度", "调色板"]
+        case .regex: return ["regex", "regexp", "match", "capture", "replace", "pattern", "正则", "匹配", "替换", "捕获"]
+        case .diff: return ["diff", "compare", "patch", "merge", "json", "contrast", "对比", "差异", "语义"]
+        case .url: return ["url", "uri", "query", "params", "curl", "fetch", "python", "httpie", "golang", "链接", "参数", "请求"]
+        case .radix: return ["radix", "binary", "hex", "octal", "decimal", "bit", "bitwise", "chmod", "endian", "bytes", "进制", "位运算", "权限", "字节"]
+        case .cidr: return ["cidr", "subnet", "ip", "ipv4", "ipv6", "netmask", "broadcast", "子网", "掩码", "网段"]
+        case .dataFormat: return ["data", "yaml", "toml", "env", "csv", "markdown", "table", "json", "convert", "表格", "互转", "配置"]
+        case .sql: return ["sql", "format", "minify", "mybatis", "gorm", "prisma", "orm", "bind", "params", "日志", "参数", "数据库"]
+        case .cert: return ["cert", "tls", "ssl", "x509", "pem", "ssh", "pubkey", "san", "fingerprint", "randomart", "证书", "公钥", "指纹"]
+        case .ocr: return ["ocr", "vision", "scan", "barcode", "qrcode", "text", "screenshot", "识字", "扫码", "截屏"]
+        case .image: return ["image", "png", "jpeg", "heic", "webp", "tiff", "gif", "exif", "gps", "resize", "datauri", "图片", "转换", "压缩", "脱敏"]
         case .password: return ["password", "pw", "secret", "token", "passphrase", "pin", "密码", "密钥"]
         case .text: return ["text", "case", "camel", "pascal", "snake", "kebab", "constant", "slug", "sort", "dedupe", "文本", "大小写", "去重"]
         case .qr: return ["qr", "qrcode", "svg", "png", "wifi", "二维码"]
         case .cron: return ["cron", "crontab", "schedule", "定时", "表达式"]
-        case .network: return ["ip", "port", "lsof", "tcp", "listen", "kill", "network", "端口", "网络"]
+        case .network: return ["ip", "port", "lsof", "tcp", "listen", "kill", "network", "hosts", "dns", "端口", "网络"]
         }
     }
 }
@@ -130,6 +186,11 @@ enum CodecSubTab: String, CaseIterable, Sendable {
     case aes = "AES-256 加解密"
 }
 
+enum UrlSubTab: String, CaseIterable, Sendable {
+    case urlParser = "URL 解析与构造"
+    case curlConverter = "cURL 转换代码"
+}
+
 @MainActor
 @Observable
 final class StudioState {
@@ -144,6 +205,7 @@ final class StudioState {
     var smartInput: String = ""
     var hashFilterHint: String = ""
     var codecTabHint: CodecSubTab = .bidirectional
+    var urlTabHint: UrlSubTab = .urlParser
     var textInput: String = ""
     var jsonInput: String = ""
     var codecInput: String = "Hello Tinycast!"
@@ -153,6 +215,18 @@ final class StudioState {
     var hashInput: String = "Hello Tinycast!"
     var uuidSeedInput: String = ""
     var colorInput: String = "#3B82F6"
+
+    var regexPattern: String = RegexEngine.presets[0].pattern
+    var regexInput: String = RegexEngine.presets[0].sample
+    var diffLeft: String = DiffEngine.sampleLeft
+    var diffRight: String = DiffEngine.sampleRight
+    var urlInput: String = UrlCurlEngine.sampleUrl
+    var curlInput: String = UrlCurlEngine.sampleCurl
+    var radixInput: String = "0xDEADBEEF"
+    var cidrInput: String = "10.0.12.34/22"
+    var dataFormatInput: String = DataFormatEngine.sampleJson
+    var sqlInput: String = SqlEngine.sampleSql
+    var certInput: String = CertEngine.sampleSshKey
 
     var onPinChange: ((Bool) -> Void)?
     var onFocusSearch: (() -> Void)?
@@ -183,21 +257,43 @@ final class StudioState {
         let clip = clipboardText ?? ""
 
         if let sel = handoffSelected, !sel.isEmpty {
+            let trimmedSel = sel.trimmingCharacters(in: .whitespacesAndNewlines)
             textInput = sel
             smartInput = sel
             hashInput = sel
             codecInput = sel
-            if (sel.hasPrefix("{") || sel.hasPrefix("[")) && JsonEngine.analyze(sel).valid {
+            regexInput = sel
+            dataFormatInput = sel
+            if resolvedTool == .diff { diffLeft = sel }
+            if (trimmedSel.hasPrefix("{") || trimmedSel.hasPrefix("[")) && JsonEngine.analyze(sel).valid {
                 jsonInput = sel
             }
             if ColorEngine.parse(sel) != nil {
-                colorInput = sel.trimmingCharacters(in: .whitespacesAndNewlines)
+                colorInput = trimmedSel
+            }
+            if trimmedSel.lowercased().hasPrefix("curl ") {
+                curlInput = sel
+                urlTabHint = .curlConverter
+            } else if UrlCurlEngine.parseUrl(trimmedSel) != nil && (trimmedSel.contains("://") || trimmedSel.contains("=")) {
+                urlInput = trimmedSel
+            }
+            if RadixBitwiseEngine.parse(trimmedSel) != nil {
+                radixInput = trimmedSel
+            }
+            if CidrEngine.parseIpv4Cidr(trimmedSel) != nil || (trimmedSel.contains(":") && CidrEngine.parseIpv6Cidr(trimmedSel) != nil) {
+                cidrInput = trimmedSel
+            }
+            if trimmedSel.contains("Preparing:") || trimmedSel.lowercased().hasPrefix("select ") || trimmedSel.lowercased().hasPrefix("with ") {
+                sqlInput = sel
+            }
+            if CertEngine.parseSshPublicKey(trimmedSel) != nil || !CertEngine.extractPemCertificates(trimmedSel).isEmpty {
+                certInput = sel
             }
         } else if !clip.isEmpty {
+            let trimmedClip = clip.trimmingCharacters(in: .whitespacesAndNewlines)
             smartInput = clip
             if resolvedTool == .text { textInput = clip }
             if resolvedTool == .json {
-                let trimmedClip = clip.trimmingCharacters(in: .whitespacesAndNewlines)
                 if jsonInput.isEmpty || trimmedClip.hasPrefix("{") || trimmedClip.hasPrefix("[") {
                     jsonInput = clip
                 }
@@ -205,7 +301,7 @@ final class StudioState {
             if resolvedTool == .codec { codecInput = clip }
             if resolvedTool == .hash { hashInput = clip }
             if resolvedTool == .qr { qrInput = clip }
-            if resolvedTool == .cron, (clip.hasPrefix("@") || clip.split(whereSeparator: \.isWhitespace).count == 5) {
+            if resolvedTool == .cron, (trimmedClip.hasPrefix("@") || trimmedClip.split(whereSeparator: \.isWhitespace).count == 5) {
                 cronInput = clip
             }
             if resolvedTool == .timestamp, TimestampEngine.parse(clip) != nil {
@@ -215,7 +311,29 @@ final class StudioState {
                 uuidSeedInput = clip
             }
             if resolvedTool == .color, ColorEngine.parse(clip) != nil {
-                colorInput = clip.trimmingCharacters(in: .whitespacesAndNewlines)
+                colorInput = trimmedClip
+            }
+            if resolvedTool == .regex { regexInput = clip }
+            if resolvedTool == .diff { diffLeft = clip }
+            if resolvedTool == .url {
+                if trimmedClip.lowercased().hasPrefix("curl ") {
+                    curlInput = clip
+                    urlTabHint = .curlConverter
+                } else if trimmedClip.contains("://") || trimmedClip.contains("=") {
+                    urlInput = trimmedClip
+                    urlTabHint = .urlParser
+                }
+            }
+            if resolvedTool == .radix, RadixBitwiseEngine.parse(trimmedClip) != nil {
+                radixInput = trimmedClip
+            }
+            if resolvedTool == .cidr, (CidrEngine.parseIpv4Cidr(trimmedClip) != nil || (trimmedClip.contains(":") && CidrEngine.parseIpv6Cidr(trimmedClip) != nil)) {
+                cidrInput = trimmedClip
+            }
+            if resolvedTool == .dataFormat { dataFormatInput = clip }
+            if resolvedTool == .sql { sqlInput = clip }
+            if resolvedTool == .cert, (CertEngine.parseSshPublicKey(trimmedClip) != nil || !CertEngine.extractPemCertificates(trimmedClip).isEmpty || trimmedClip.contains("-----BEGIN")) {
+                certInput = clip
             }
         }
     }
@@ -230,6 +348,13 @@ final class StudioState {
             if q.contains("jwt") { codecTabHint = .jwt }
             else if q.contains("aes") || q.contains("gcm") || q.contains("cbc") { codecTabHint = .aes }
             else { codecTabHint = .bidirectional }
+        }
+        if tool == .url {
+            if q.contains("curl") || q.contains("fetch") || q.contains("httpie") {
+                urlTabHint = .curlConverter
+            } else if q == "url" {
+                urlTabHint = .urlParser
+            }
         }
     }
 

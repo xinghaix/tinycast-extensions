@@ -88,6 +88,10 @@ struct SmartClipboardView: View {
         ("JSON 片段", "{\"service\":\"tinycast\",\"native\":true,\"version\":2,\"tags\":[\"swiftui\",\"appkit\"]}"),
         ("Base64 文本", "SGVsbG8sIFdvcmxkISAtIFRpbnljYXN0IERldktpdA=="),
         ("JWT Token", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzQyIiwibmFtZSI6IlRpbnljYXN0IiwiaWF0IjoxNzMxODMwNDAwfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
+        ("CIDR 网段", "10.0.12.34/22"),
+        ("cURL 请求", UrlCurlEngine.sampleCurl),
+        ("SQL 参数日志", SqlEngine.sampleMyBatisLog),
+        ("SSH 公钥", CertEngine.sampleSshKey),
     ]
 
     var body: some View {
@@ -286,6 +290,104 @@ struct SmartClipboardView: View {
             }
         }
 
+        if kind == .certOrSsh {
+            StudioPanel(title: "识别为 X.509 证书 / SSH 公钥") {
+                HStack {
+                    if let ssh = CertEngine.parseSshPublicKey(trimmed) {
+                        Text("\(ssh.algorithmLabel) (\(ssh.bitLength)-bit) · \(ssh.sha256Fingerprint)")
+                            .font(.system(size: 11.5, design: .monospaced))
+                    } else {
+                        Text("检测到 PEM/DER X.509 证书")
+                            .font(.system(size: 11.5))
+                    }
+                    Spacer()
+                    StudioToolBarButton(title: "前往证书 / SSH 解析 →", icon: "checkmark.seal", tint: .green) {
+                        studio.certInput = trimmed
+                        studio.jump(to: .cert)
+                    }
+                }
+            }
+        }
+
+        if kind == .curl, let req = try? UrlCurlEngine.parseCurl(trimmed) {
+            StudioPanel(title: "识别为 cURL 命令 · \(req.method)") {
+                HStack {
+                    Text(req.url)
+                        .font(.system(size: 11.5, design: .monospaced))
+                        .lineLimit(1)
+                    Spacer()
+                    StudioToolBarButton(title: "转换为 Fetch / Python / Go →", icon: "link", tint: .cyan) {
+                        studio.curlInput = trimmed
+                        studio.urlTabHint = .curlConverter
+                        studio.jump(to: .url)
+                    }
+                }
+                CopyableResultRow(title: "JavaScript fetch 预览", value: UrlCurlEngine.toFetch(req), badge: req.method, badgeColor: .cyan)
+            }
+        }
+
+        if kind == .url, let urlModel = UrlCurlEngine.parseUrl(trimmed) {
+            StudioPanel(title: "识别为 URL · \(urlModel.params.count) 个 Query 参数") {
+                HStack {
+                    Text(urlModel.host.isEmpty ? urlModel.path : urlModel.host)
+                        .font(.system(size: 11.5, design: .monospaced))
+                    Spacer()
+                    StudioToolBarButton(title: "编辑 URL 参数 →", icon: "link", tint: .cyan) {
+                        studio.urlInput = trimmed
+                        studio.urlTabHint = .urlParser
+                        studio.jump(to: .url)
+                    }
+                }
+                ForEach(urlModel.params.prefix(5)) { p in
+                    CopyableResultRow(title: "Query: \(p.key)", value: p.value, badge: "Param", badgeColor: .cyan)
+                }
+            }
+        }
+
+        if kind == .cidr {
+            if let v4 = CidrEngine.parseIpv4Cidr(trimmed) {
+                StudioPanel(title: "识别为 IPv4 网段 · \(v4.cidrNotation)") {
+                    HStack {
+                        BadgePill(text: v4.scope, color: .teal)
+                        BadgePill(text: "\(v4.usableCount) 可用 IP", color: .green)
+                        Spacer()
+                        StudioToolBarButton(title: "前往 CIDR 计算器 →", icon: "point.3.connected.trianglepath.dotted", tint: .teal) {
+                            studio.cidrInput = trimmed
+                            studio.jump(to: .cidr)
+                        }
+                    }
+                    CopyableResultRow(title: "可用范围", value: "\(v4.firstHost) – \(v4.lastHost)", badge: v4.netmask, badgeColor: .teal)
+                }
+            } else if let v6 = CidrEngine.parseIpv6Cidr(trimmed) {
+                StudioPanel(title: "识别为 IPv6 网段 · \(v6.cidrNotation)") {
+                    HStack {
+                        BadgePill(text: v6.scope, color: .teal)
+                        Spacer()
+                        StudioToolBarButton(title: "前往 CIDR 计算器 →", icon: "point.3.connected.trianglepath.dotted", tint: .teal) {
+                            studio.cidrInput = trimmed
+                            studio.jump(to: .cidr)
+                        }
+                    }
+                    CopyableResultRow(title: "网段范围", value: "\(v6.compressedNetwork) – \(v6.compressedEnd)")
+                }
+            }
+        }
+
+        if kind == .sql {
+            let bound = SqlEngine.bindParameters(sqlOrLog: trimmed, manualParams: "", formatOutput: true)
+            StudioPanel(title: "识别为 SQL / ORM 日志") {
+                HStack {
+                    BadgePill(text: bound.detectedFormat, color: .blue)
+                    Spacer()
+                    StudioToolBarButton(title: "前往 SQL & 日志工具 →", icon: "cylinder.split.1x2", tint: .blue) {
+                        studio.sqlInput = trimmed
+                        studio.jump(to: .sql)
+                    }
+                }
+                CopyableResultRow(title: "格式化 SQL 预览", value: bound.formattedSql, badge: "SQL", badgeColor: .blue)
+            }
+        }
+
         let plausibleCodecs = CodecEngine.runAllCodecs(trimmed).filter(\.plausible)
         if !plausibleCodecs.isEmpty && kind != .json {
             StudioPanel(title: "可解码候选") {
@@ -352,6 +454,14 @@ struct SmartClipboardView: View {
                         StudioToolBarButton(title: "JSON 工具", icon: "curlybraces") {
                             studio.jsonInput = raw
                             studio.jump(to: .json)
+                        }
+                        StudioToolBarButton(title: "Regex 正则", icon: "text.magnifyingglass") {
+                            studio.regexInput = raw
+                            studio.jump(to: .regex)
+                        }
+                        StudioToolBarButton(title: "文本对比 (Diff)", icon: "arrow.left.arrow.right.square") {
+                            studio.diffLeft = raw
+                            studio.jump(to: .diff)
                         }
                         StudioToolBarButton(title: "生成大图二维码", icon: "qrcode") {
                             studio.qrInput = raw

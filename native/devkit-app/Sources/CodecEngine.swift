@@ -569,11 +569,12 @@ enum CodecEngine {
             guard let comps = URLComponents(string: s), let items = comps.queryItems, !items.isEmpty else { return nil }
             return items.map { ($0.name, $0.value ?? "") }
         }
-        if s.contains("=") && (s.contains("?") || s.contains("&")) {
+        if !s.contains("\n") && !s.contains("\r") && !s.contains(" ") && !s.contains("\t")
+            && s.contains("=") && (s.contains("?") || s.contains("&")) {
             let q = s.contains("?") ? String(s[s.index(after: s.firstIndex(of: "?")!)...]) : s
-            var comps = URLComponents()
-            comps.percentEncodedQuery = q
-            guard let items = comps.queryItems, !items.isEmpty else { return nil }
+            guard !q.isEmpty,
+                  let comps = URLComponents(string: "https://example.invalid/?\(q)"),
+                  let items = comps.queryItems, !items.isEmpty else { return nil }
             return items.map { ($0.name, $0.value ?? "") }
         }
         return nil

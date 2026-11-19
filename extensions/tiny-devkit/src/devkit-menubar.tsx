@@ -166,8 +166,14 @@ export default function Command() {
         <MenuBarExtra.Item icon={Icon.Hashtag} title="Hash 与文件校验…" onAction={() => openStudio("hash")} />
         <MenuBarExtra.Item icon={Icon.Code} title="算法编解码 & 加解密…" onAction={() => openStudio("codec")} />
         <MenuBarExtra.Item icon={Icon.CodeBlock} title="JSON 格式化与转换…" onAction={() => openStudio("json")} />
+        <MenuBarExtra.Item icon={Icon.MagnifyingGlass} title="Regex 正则实验室…" onAction={() => openStudio("regex")} />
+        <MenuBarExtra.Item icon={Icon.ArrowLeftCircle} title="文本 / JSON 语义 Diff…" onAction={() => openStudio("diff")} />
+        <MenuBarExtra.Item icon={Icon.Link} title="URL & cURL 互转…" onAction={() => openStudio("url")} />
+        <MenuBarExtra.Item icon={Icon.Text} title="苹果 Vision 离线 OCR…" onAction={() => openStudio("ocr")} />
+        <MenuBarExtra.Item icon={Icon.Image} title="图片转换与去 EXIF…" onAction={() => openStudio("image")} />
+        <MenuBarExtra.Item icon={Icon.Lock} title="TLS 证书 & SSH 公钥…" onAction={() => openStudio("cert")} />
         <MenuBarExtra.Item icon={Icon.Key} title="密码与密钥生成器…" onAction={() => openStudio("password")} />
-        <MenuBarExtra.Item icon={Icon.Globe} title="本机 IP 与监听端口…" onAction={() => openStudio("network")} />
+        <MenuBarExtra.Item icon={Icon.Globe} title="本机 IP / 端口 / Hosts…" onAction={() => openStudio("network")} />
       </MenuBarExtra.Section>
     </MenuBarExtra>
   );

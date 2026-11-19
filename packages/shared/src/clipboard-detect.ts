@@ -4,7 +4,7 @@ import { parseTimestampInput } from "./timestamp.ts";
 import { inspectIdentifier } from "./uuid.ts";
 
 export interface ClipboardDetection {
-  kind: "uuid-or-id" | "jwt" | "timestamp" | "json" | "url" | "base64" | "hex" | "color" | "text";
+  kind: "uuid-or-id" | "jwt" | "timestamp" | "json" | "cert" | "curl" | "url" | "cidr" | "base64" | "hex" | "color" | "sql" | "text";
   label: string;
   preview: string;
 }
@@ -28,8 +28,20 @@ export function detectClipboardKind(raw: string): ClipboardDetection {
   if ((s.startsWith("{") || s.startsWith("[")) && analyzeJson(s).valid) {
     return { kind: "json", label: "JSON 数据", preview };
   }
+  if (
+    s.includes("-----BEGIN CERTIFICATE-----") ||
+    /^(?:ssh-(?:ed25519|rsa)|ecdsa-sha2-nistp(?:256|384|521)|sk-ssh-ed25519@openssh\.com)\s+[A-Za-z0-9+/=]{16,}/.test(s)
+  ) {
+    return { kind: "cert", label: "X.509 证书 / SSH 公钥", preview };
+  }
+  if (/^curl(?:\s|$)/i.test(s)) {
+    return { kind: "curl", label: "cURL 请求命令", preview };
+  }
   if (/^https?:\/\//i.test(s) || parseUrlQueryParams(s)) {
     return { kind: "url", label: "URL / 链接参数", preview };
+  }
+  if (/^(?:25[0-5]|2[0-4]\d|1?\d\d?)(?:\.(?:25[0-5]|2[0-4]\d|1?\d\d?)){3}\/(?:3[0-2]|[12]?\d)$/.test(s)) {
+    return { kind: "cidr", label: "CIDR 网段", preview };
   }
   if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$|^rgba?\(|^hsla?\(/i.test(s)) {
     return { kind: "color", label: "颜色值", preview };
@@ -39,6 +51,13 @@ export function detectClipboardKind(raw: string): ClipboardDetection {
   }
   if (decodeHexStrict(s)) {
     return { kind: "hex", label: "Hex 十六进制内容", preview };
+  }
+  if (
+    s.includes("Preparing:") ||
+    (/^(?:with|select|insert\s+into|update|delete\s+from|create\s+table|alter\s+table)\b/i.test(s) &&
+      /\b(?:from|into|set|values|where|join|table|select)\b/i.test(s))
+  ) {
+    return { kind: "sql", label: "SQL 语句 / ORM 日志", preview };
   }
   return { kind: "text", label: "纯文本", preview };
 }
