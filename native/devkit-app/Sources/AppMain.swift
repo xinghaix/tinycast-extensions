@@ -99,6 +99,7 @@ private func normalizeToolArg(_ raw: String?) -> String? {
     case "cert-inspector", "cert", "tls", "ssh": return "cert"
     case "ocr-scanner", "ocr": return "ocr"
     case "image-converter", "image": return "image"
+    case "currency-converter", "currency", "fx", "exchange", "rate": return "currency"
     case "password-generator", "password": return "password"
     case "text-transform", "text": return "text"
     case "qr-generator", "qr": return "qr"
@@ -388,9 +389,26 @@ private func runSelfTests() -> Never {
     check(SmartDetector.detect(SqlEngine.sampleMyBatisLog) == .sql, "SmartDetector SQL")
     check(SmartDetector.detect(CertEngine.sampleSshKey) == .certOrSsh, "SmartDetector SSH")
 
-    // 14. All ToolID tabs + jump routing (22 tools)
+    // 14. Currency & FX Calculator Engine
+    check(CurrencyEngine.evaluateExpression("(100 + 50) * 2 / 3") == 100.0, "Currency expression math")
+    check(CurrencyEngine.evaluateExpression("1,000 * 10%") == 100.0, "Currency percent & comma expression")
+    check(CurrencyEngine.evaluateExpression("10 / 0") == nil, "Currency divide by zero guard")
+    let usdParsed = CurrencyEngine.parseCurrencyQuery("$199.50")
+    let jpyParsed = CurrencyEngine.parseCurrencyQuery("5000 JPY")
+    let hkdParsed = CurrencyEngine.parseCurrencyQuery("HK$88")
+    check(usdParsed?.amount == 199.5 && usdParsed?.code == "USD", "Currency parse $199.50")
+    check(jpyParsed?.amount == 5000 && jpyParsed?.code == "JPY", "Currency parse 5000 JPY")
+    check(hkdParsed?.amount == 88 && hkdParsed?.code == "HKD", "Currency parse HK$88")
+    check(CurrencyEngine.parseCurrencyQuery("1731830400") == nil, "Plain timestamp must not parse as currency")
+    let cnyMid = CurrencyEngine.convert(amount: 100, from: "USD", to: "CNY", snapshot: CurrencyEngine.offlineFallbackSnapshot)!
+    let cnyFee = CurrencyEngine.convert(amount: 100, from: "USD", to: "CNY", snapshot: CurrencyEngine.offlineFallbackSnapshot, feePercent: 2.0)!
+    check(cnyMid > 600 && cnyMid < 800, "Currency USD -> CNY conversion")
+    check(abs(cnyFee - cnyMid * 1.02) < 1e-6, "Currency spread fee multiplier")
+    check(SmartDetector.detect("$199.50") == .currency, "SmartDetector currency")
+
+    // 15. All ToolID tabs + jump routing (23 tools)
     let studio = StudioState()
-    check(ToolID.allCases.count == 22, "22 Studio tools registered")
+    check(ToolID.allCases.count == 23, "23 Studio tools registered")
     for tool in ToolID.allCases {
         studio.jump(to: tool, searchTerm: tool == .hash ? "md5" : (tool == .codec ? "jwt" : ""))
         check(studio.activeTool == tool, "Switch tool \(tool.rawValue)")
@@ -578,6 +596,7 @@ struct StudioRootView: View {
         case .cert: CertToolView()
         case .ocr: OcrScannerToolView()
         case .image: ImageConverterToolView()
+        case .currency: CurrencyToolView()
         case .password: PasswordToolView()
         case .text: TextToolView()
         case .qr: QrToolView()

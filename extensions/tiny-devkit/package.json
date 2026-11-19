@@ -184,6 +184,15 @@
       "keywords": ["sql", "format", "mybatis", "gorm", "prisma", "orm", "bind", "日志", "参数"]
     },
     {
+      "name": "currency-converter",
+      "title": "各国汇率计算器",
+      "subtitle": "166+ 法币 / 加密 / 黄金 · 表达式 · 历史走势",
+      "description": "在原生悬浮工作台中实时互转多国法币与加密货币/贵金属汇率，支持四则表达式、银行点差估算、本地缓存与 30/90 天历史走势图",
+      "mode": "no-view",
+      "icon": "cmd-currency.png",
+      "keywords": ["currency", "fx", "exchange", "rate", "money", "usd", "cny", "rmb", "hkd", "jpy", "eur", "gbp", "twd", "krw", "btc", "xau", "汇率", "货币", "换算", "美元", "人民币", "日元", "港币"]
+    },
+    {
       "name": "quick-uuid-v4",
       "title": "快速生成 UUID v4",
       "subtitle": "直接复制并提示",

@@ -27,6 +27,7 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
     case cert
     case ocr
     case image
+    case currency
     case password
     case text
     case qr
@@ -43,7 +44,7 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
             return .core
         case .dataFormat, .sql, .cert:
             return .data
-        case .ocr, .image, .password, .text, .qr, .cron, .network:
+        case .ocr, .image, .currency, .password, .text, .qr, .cron, .network:
             return .media
         }
     }
@@ -67,6 +68,7 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
         case .cert: return "TLS 证书/SSH"
         case .ocr: return "离线 OCR 识字"
         case .image: return "图片转换/EXIF"
+        case .currency: return "汇率换算"
         case .password: return "密码与密钥"
         case .text: return "文本格式化"
         case .qr: return "二维码生成"
@@ -94,6 +96,7 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
         case .cert: return "checkmark.seal"
         case .ocr: return "text.viewfinder"
         case .image: return "photo.on.rectangle.angled"
+        case .currency: return "banknote"
         case .password: return "key"
         case .text: return "doc.plaintext"
         case .qr: return "qrcode"
@@ -121,6 +124,7 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
         case .cert: return .green
         case .ocr: return .purple
         case .image: return .pink
+        case .currency: return .green
         case .password: return .pink
         case .text: return .blue
         case .qr: return .primary
@@ -148,6 +152,7 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
         case .cert: return ["cert", "tls", "ssl", "x509", "pem", "ssh", "pubkey", "san", "fingerprint", "randomart", "证书", "公钥", "指纹"]
         case .ocr: return ["ocr", "vision", "scan", "barcode", "qrcode", "text", "screenshot", "识字", "扫码", "截屏"]
         case .image: return ["image", "png", "jpeg", "heic", "webp", "tiff", "gif", "exif", "gps", "resize", "datauri", "图片", "转换", "压缩", "脱敏"]
+        case .currency: return ["currency", "fx", "exchange", "rate", "money", "usd", "cny", "rmb", "hkd", "jpy", "eur", "gbp", "twd", "krw", "btc", "xau", "汇率", "货币", "换算", "美元", "人民币", "日元", "港币", "欧元", "黄金"]
         case .password: return ["password", "pw", "secret", "token", "passphrase", "pin", "密码", "密钥"]
         case .text: return ["text", "case", "camel", "pascal", "snake", "kebab", "constant", "slug", "sort", "dedupe", "文本", "大小写", "去重"]
         case .qr: return ["qr", "qrcode", "svg", "png", "wifi", "二维码"]
@@ -227,6 +232,9 @@ final class StudioState {
     var dataFormatInput: String = DataFormatEngine.sampleJson
     var sqlInput: String = SqlEngine.sampleSql
     var certInput: String = CertEngine.sampleSshKey
+    var currencyBaseCode: String = "USD"
+    var currencyTargetCode: String = "CNY"
+    var currencyAmountInput: String = "100"
 
     var onPinChange: ((Bool) -> Void)?
     var onFocusSearch: (() -> Void)?
@@ -289,6 +297,11 @@ final class StudioState {
             if CertEngine.parseSshPublicKey(trimmedSel) != nil || !CertEngine.extractPemCertificates(trimmedSel).isEmpty {
                 certInput = sel
             }
+            if let cur = CurrencyEngine.parseCurrencyQuery(trimmedSel) {
+                currencyBaseCode = cur.code
+                currencyTargetCode = (cur.code == "CNY" ? "USD" : "CNY")
+                currencyAmountInput = CurrencyEngine.formatCopyPlain(cur.amount, code: cur.code)
+            }
         } else if !clip.isEmpty {
             let trimmedClip = clip.trimmingCharacters(in: .whitespacesAndNewlines)
             smartInput = clip
@@ -334,6 +347,11 @@ final class StudioState {
             if resolvedTool == .sql { sqlInput = clip }
             if resolvedTool == .cert, (CertEngine.parseSshPublicKey(trimmedClip) != nil || !CertEngine.extractPemCertificates(trimmedClip).isEmpty || trimmedClip.contains("-----BEGIN")) {
                 certInput = clip
+            }
+            if resolvedTool == .currency, let cur = CurrencyEngine.parseCurrencyQuery(trimmedClip) {
+                currencyBaseCode = cur.code
+                currencyTargetCode = (cur.code == "CNY" ? "USD" : "CNY")
+                currencyAmountInput = CurrencyEngine.formatCopyPlain(cur.amount, code: cur.code)
             }
         }
     }
