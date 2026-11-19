@@ -26,12 +26,22 @@ const STUDIO_LAUNCHER_COMMANDS = new Set([
   "encode-decode",
   "json-formatter",
   "color-converter",
+  "regex-tester",
+  "text-diff",
+  "url-parser",
+  "number-base",
+  "cidr-calculator",
+  "cert-inspector",
+  "data-converter",
+  "sql-formatter",
   "password-generator",
   "text-transform",
   "qr-generator",
   "cron-inspector",
   "network-ports",
   "smart-clipboard",
+  "ocr-scanner",
+  "image-converter",
 ]);
 
 const wait = (ms = 90) => new Promise((r) => setTimeout(r, ms));
@@ -214,6 +224,7 @@ async function verifyWithTinycastHarness(devkitDir, shortcutsDir) {
     const mode = opts.overrideMode ?? cmd.mode;
 
     const copied = [];
+    const pasted = [];
     const huds = [];
     const toasts = [];
     let clipboardContent = opts.clipboard ?? "";
@@ -224,6 +235,11 @@ async function verifyWithTinycastHarness(devkitDir, shortcutsDir) {
         "clipboard.readText": () => clipboardContent,
         "clipboard.copy": ([content]) => {
           copied.push(content);
+          if (content?.text !== undefined) clipboardContent = content.text;
+          return null;
+        },
+        "clipboard.paste": ([content]) => {
+          pasted.push(content);
           if (content?.text !== undefined) clipboardContent = content.text;
           return null;
         },
@@ -255,6 +271,13 @@ async function verifyWithTinycastHarness(devkitDir, shortcutsDir) {
 
     harness.boot(
       bootConfig({
+        node: {
+          ...bootConfig().node,
+          env: {
+            ...bootConfig().node.env,
+            ...(opts.env ?? {}),
+          },
+        },
         environment: {
           ...bootConfig().environment,
           extensionName: manifest.name,
@@ -285,7 +308,7 @@ async function verifyWithTinycastHarness(devkitDir, shortcutsDir) {
       throw new Error(`Command ${manifest.name}/${cmd.name} failed:\n${harness.state.failures.join("\n")}`);
     }
 
-    return { harness, copied, huds, toasts, cmd, manifest, procStartCount: () => procStartCount };
+    return { harness, copied, pasted, huds, toasts, cmd, manifest, procStartCount: () => procStartCount };
   }
 
   async function verifyStudioLauncher(extDir, cmdName, extraOpts = {}) {
@@ -309,6 +332,14 @@ async function verifyWithTinycastHarness(devkitDir, shortcutsDir) {
     "hash-generator",
     "encode-decode",
     "json-formatter",
+    "regex-tester",
+    "text-diff",
+    "url-parser",
+    "number-base",
+    "cidr-calculator",
+    "cert-inspector",
+    "data-converter",
+    "sql-formatter",
   ]) {
     await verifyStudioLauncher(devkitDir, cmd);
   }
@@ -378,6 +409,8 @@ async function verifyWithTinycastHarness(devkitDir, shortcutsDir) {
     "cron-inspector",
     "network-ports",
     "smart-clipboard",
+    "ocr-scanner",
+    "image-converter",
   ]) {
     await verifyStudioLauncher(shortcutsDir, cmd);
   }
@@ -405,6 +438,34 @@ async function verifyWithTinycastHarness(devkitDir, shortcutsDir) {
     console.log(`  ✓ copy-finder-path (${huds[0]})`);
   }
 
+  {
+    const { harness, copied, pasted, huds } = await runCommandTest(shortcutsDir, "paste-plain-text", {
+      clipboard: "  hello\r\n\tworld  ",
+      arguments: { mode: "singleline" },
+    });
+    assert.equal(harness.state.finished, true);
+    assert.equal(copied[0]?.text, "hello world");
+    assert.equal(pasted[0]?.text, "hello world");
+    assert.equal(huds.length, 1);
+    harness.stop("s1");
+    console.log(`  ✓ paste-plain-text (${huds[0]})`);
+  }
+
+  for (const [cmdName, args] of [
+    ["toggle-caffeinate", { duration: "30m" }],
+    ["flush-dns", {}],
+  ]) {
+    const { harness, huds } = await runCommandTest(shortcutsDir, cmdName, {
+      arguments: args,
+      env: { TINYCAST_SYSTEM_DRY_RUN: "1" },
+    });
+    assert.equal(harness.state.finished, true, `${cmdName} should finish cleanly`);
+    assert.equal(huds.length, 1, `${cmdName} should show HUD`);
+    assert.ok(huds[0].includes("[DRY_RUN]"), `${cmdName} should honor TINYCAST_SYSTEM_DRY_RUN, got: ${huds[0]}`);
+    harness.stop("s1");
+    console.log(`  ✓ ${cmdName} (${huds[0]})`);
+  }
+
   delete process.env.TINYCAST_STUDIO_DRY_RUN;
 }
 
@@ -421,7 +482,7 @@ async function verifyAll() {
     console.log("\n(Tinycast runtime harness not detected locally; completed standalone CI verification.)");
   }
 
-  console.log("\nAll 20 extension commands and native DevKit Studio checks passed cleanly!");
+  console.log("\nAll 33 extension commands and 22 native DevKit Studio tools passed cleanly!");
 }
 
 await verifyAll();

@@ -40,6 +40,20 @@
       "required": false,
       "title": "二维码保存目录",
       "description": "保存二维码文件的默认目录（留空则保存到桌面 ~/Desktop）"
+    },
+    {
+      "name": "defaultCaffeinateDuration",
+      "type": "dropdown",
+      "required": false,
+      "title": "防休眠默认时长",
+      "description": "使用「切换防休眠 (Caffeinate)」直接开启时的默认持续时长",
+      "default": "1h",
+      "data": [
+        { "title": "30 分钟 (30m)", "value": "30m" },
+        { "title": "1 小时 (1h)", "value": "1h" },
+        { "title": "2 小时 (2h)", "value": "2h" },
+        { "title": "持续亮屏直到手动关闭 (forever)", "value": "forever" }
+      ]
     }
   ],
   "commands": [
@@ -126,6 +140,57 @@
       "mode": "no-view",
       "icon": "cmd-finder.png",
       "keywords": ["finder", "path", "copy", "posix", "路径", "复制"]
+    },
+    {
+      "name": "ocr-scanner",
+      "title": "离线 OCR 识字与二维码识别",
+      "subtitle": "Apple Vision 框选截屏识字 / 扫码解码",
+      "description": "在原生悬浮工作台中调用 Apple Vision 本地离线识别截图文字（中英日代码）与二维码/条形码",
+      "mode": "no-view",
+      "icon": "cmd-ocr.png",
+      "keywords": ["ocr", "vision", "scan", "qrcode", "barcode", "text", "screenshot", "识字", "扫码", "截屏"]
+    },
+    {
+      "name": "image-converter",
+      "title": "图片转换、缩放与去 EXIF",
+      "subtitle": "PNG / JPEG / HEIC / WebP · DataURI · 隐私脱敏",
+      "description": "在原生悬浮工作台中离线转换图片格式、缩放尺寸、自动剥离 EXIF/GPS 位置信息并生成 DataURI",
+      "mode": "no-view",
+      "icon": "cmd-image.png",
+      "keywords": ["image", "png", "jpeg", "heic", "webp", "exif", "gps", "resize", "datauri", "图片", "转换", "去exif"]
+    },
+    {
+      "name": "toggle-caffeinate",
+      "title": "切换防休眠 (Caffeinate)",
+      "subtitle": "支持 30m / 1h / forever / off 参数",
+      "description": "无视图快捷入口：调用 macOS 原生 caffeinate 一键开启或关闭屏幕与系统防休眠",
+      "mode": "no-view",
+      "icon": "cmd-caffeinate.png",
+      "keywords": ["caffeinate", "awake", "sleep", "screen", "keep", "防休眠", "亮屏", "休息"],
+      "arguments": [
+        { "name": "duration", "type": "text", "placeholder": "30m / 1h / forever / off", "required": false }
+      ]
+    },
+    {
+      "name": "paste-plain-text",
+      "title": "纯文本粘贴 (去除样式)",
+      "subtitle": "自动去除富文本字体/背景后粘贴到当前应用",
+      "description": "无视图快捷入口：清洗剪贴板富文本格式并直接粘贴纯文本（可选 mode: trim / singleline）",
+      "mode": "no-view",
+      "icon": "cmd-plain-paste.png",
+      "keywords": ["paste", "plain", "text", "strip", "format", "纯文本", "粘贴", "去格式"],
+      "arguments": [
+        { "name": "mode", "type": "text", "placeholder": "trim / singleline", "required": false }
+      ]
+    },
+    {
+      "name": "flush-dns",
+      "title": "刷新 macOS DNS 缓存",
+      "subtitle": "dscacheutil + mDNSResponder 一键清理",
+      "description": "无视图快捷入口：清理本机 DNS 解析缓存（Hosts 变更或切换环境后立即生效）",
+      "mode": "no-view",
+      "icon": "cmd-dns.png",
+      "keywords": ["dns", "flush", "cache", "hosts", "network", "mdnsresponder", "缓存", "刷新"]
     }
   ]
 }

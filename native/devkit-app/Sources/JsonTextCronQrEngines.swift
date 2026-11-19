@@ -890,7 +890,96 @@ struct ListeningPortEntry: Identifiable, Sendable {
     let url: String
 }
 
+struct HostsEntry: Identifiable, Sendable {
+    let id: Int
+    let ip: String
+    let hostnames: [String]
+    let comment: String?
+    let lineNumber: Int
+    let isDisabled: Bool
+}
+
 enum NetworkEngine {
+    static func readHostsFile(path: String = "/etc/hosts") -> [HostsEntry] {
+        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return [] }
+        var entries: [HostsEntry] = []
+        var counter = 0
+        for (idx, rawLine) in content.components(separatedBy: .newlines).enumerated() {
+            var line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty { continue }
+
+            var isDisabled = false
+            if line.hasPrefix("#") {
+                let uncommented = String(line.dropFirst()).trimmingCharacters(in: .whitespaces)
+                // Only treat as disabled host mapping if first token after `#` parses as an IPv4/IPv6 address
+                if let firstTok = uncommented.split(whereSeparator: \.isWhitespace).first.map(String.init),
+                   CidrEngine.parseIpv4(firstTok) != nil || CidrEngine.parseIpv6Address(firstTok) != nil {
+                    isDisabled = true
+                    line = uncommented
+                } else {
+                    continue
+                }
+            }
+
+            var comment: String? = nil
+            if let hashIdx = line.firstIndex(of: "#") {
+                let c = String(line[line.index(after: hashIdx)...]).trimmingCharacters(in: .whitespaces)
+                if !c.isEmpty { comment = c }
+                line = String(line[..<hashIdx]).trimmingCharacters(in: .whitespaces)
+            }
+            let tokens = line.split(whereSeparator: \.isWhitespace).map(String.init)
+            guard tokens.count >= 2 else { continue }
+            let ip = tokens[0]
+            guard CidrEngine.parseIpv4(ip) != nil || CidrEngine.parseIpv6Address(ip) != nil else { continue }
+            entries.append(HostsEntry(
+                id: counter,
+                ip: ip,
+                hostnames: Array(tokens.dropFirst()),
+                comment: comment,
+                lineNumber: idx + 1,
+                isDisabled: isDisabled
+            ))
+            counter += 1
+        }
+        return entries
+    }
+
+    static func flushDnsCache() async -> (ok: Bool, message: String) {
+        await Task.detached(priority: .userInitiated) {
+            func run(_ exe: String, _ args: [String]) -> Int32 {
+                let p = Process()
+                p.executableURL = URL(fileURLWithPath: exe)
+                p.arguments = args
+                p.standardOutput = FileHandle.nullDevice
+                p.standardError = FileHandle.nullDevice
+                do { try p.run(); p.waitUntilExit(); return p.terminationStatus } catch { return -1 }
+            }
+            _ = run("/usr/bin/dscacheutil", ["-flushcache"])
+            let rc = run("/usr/bin/killall", ["-HUP", "mDNSResponder"])
+            if rc == 0 {
+                return (true, "DNS 缓存已刷新 (dscacheutil + mDNSResponder)")
+            }
+            // Escalate via native macOS administrator authorization dialog only if non-root HUP failed
+            let osa = Process()
+            osa.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+            osa.arguments = ["-e", #"do shell script "dscacheutil -flushcache; killall -HUP mDNSResponder" with administrator privileges"#]
+            let errPipe = Pipe()
+            osa.standardError = errPipe
+            do {
+                try osa.run()
+                osa.waitUntilExit()
+                if osa.terminationStatus == 0 {
+                    return (true, "已通过管理员授权刷新 DNS 缓存")
+                }
+                let errMsg = String(decoding: errPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return (false, errMsg.isEmpty ? "已取消授权或刷新失败" : errMsg)
+            } catch {
+                return (false, error.localizedDescription)
+            }
+        }.value
+    }
+
     static func readLocalInterfaces() -> [NetworkInterfaceEntry] {
         var listPtr: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&listPtr) == 0, let first = listPtr else { return [] }
@@ -988,7 +1077,7 @@ enum NetworkEngine {
 // MARK: - Smart Clipboard Detection
 
 enum SmartClipboardKind: Sendable {
-    case empty, uuidOrId, jwt, timestamp, json, url, color, base64, hex, text
+    case empty, uuidOrId, jwt, timestamp, json, certOrSsh, curl, url, cidr, color, base64, hex, sql, text
 
     var label: String {
         switch self {
@@ -997,10 +1086,14 @@ enum SmartClipboardKind: Sendable {
         case .jwt: return "JWT Token"
         case .timestamp: return "时间戳 / 日期"
         case .json: return "JSON 数据"
+        case .certOrSsh: return "X.509 证书 / SSH 公钥"
+        case .curl: return "cURL 请求命令"
         case .url: return "URL / 链接参数"
+        case .cidr: return "CIDR 网段"
         case .color: return "颜色 / 色值"
         case .base64: return "Base64 编码内容"
         case .hex: return "Hex 十六进制内容"
+        case .sql: return "SQL 语句 / ORM 日志"
         case .text: return "纯文本"
         }
     }
@@ -1017,8 +1110,18 @@ enum SmartDetector {
             return .timestamp
         }
         if (s.hasPrefix("{") || s.hasPrefix("[")) && JsonEngine.analyze(s).valid { return .json }
-        if s.lowercased().hasPrefix("http://") || s.lowercased().hasPrefix("https://") || CodecEngine.parseUrlQueryParams(s) != nil {
+        if CertEngine.parseSshPublicKey(s) != nil || !CertEngine.extractPemCertificates(s).isEmpty {
+            return .certOrSsh
+        }
+        let lower = s.lowercased()
+        if lower.hasPrefix("curl ") || lower.hasPrefix("curl\t") || lower.hasPrefix("curl\n") {
+            return .curl
+        }
+        if lower.hasPrefix("http://") || lower.hasPrefix("https://") || CodecEngine.parseUrlQueryParams(s) != nil {
             return .url
+        }
+        if s.contains("/") && (CidrEngine.parseIpv4Cidr(s) != nil || (s.contains(":") && CidrEngine.parseIpv6Cidr(s) != nil)) {
+            return .cidr
         }
         if !s.hasPrefix("#"), let hex = CodecEngine.decodeHexBytes(s), CodecEngine.looksReadableUtf8(hex) {
             return .hex
@@ -1026,6 +1129,11 @@ enum SmartDetector {
         if ColorEngine.parse(s) != nil { return .color }
         if CodecEngine.decodeBase64Strict(s) != nil { return .base64 }
         if let hex = CodecEngine.decodeHexBytes(s), CodecEngine.looksReadableUtf8(hex) { return .hex }
+        if s.contains("Preparing:") ||
+           (s.range(of: #"^(?is)(with|select|insert\s+into|update|delete\s+from|create\s+table|alter\s+table)\b"#, options: .regularExpression) != nil &&
+            s.range(of: #"(?is)\b(from|into|set|values|where|join|table|select)\b"#, options: .regularExpression) != nil) {
+            return .sql
+        }
         return .text
     }
 }

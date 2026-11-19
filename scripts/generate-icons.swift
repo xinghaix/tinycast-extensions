@@ -119,6 +119,14 @@ let specs: [IconSpec] = [
     IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-codec.png", symbol: "chevron.left.forwardslash.chevron.right", fallbackSymbol: "curlybraces", topHex: 0x8B5CF6, bottomHex: 0x6D28D9),
     IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-json.png", symbol: "curlybraces", fallbackSymbol: "doc.text.fill", topHex: 0x06B6D4, bottomHex: 0x0E7490),
     IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-color.png", symbol: "paintpalette.fill", fallbackSymbol: "eyedropper", topHex: 0xEC4899, bottomHex: 0x8B5CF6),
+    IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-regex.png", symbol: "text.magnifyingglass", fallbackSymbol: "magnifyingglass", topHex: 0xF59E0B, bottomHex: 0xB45309),
+    IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-diff.png", symbol: "arrow.left.arrow.right.square.fill", fallbackSymbol: "rectangle.split.2x1.fill", topHex: 0x3B82F6, bottomHex: 0x1E40AF),
+    IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-url.png", symbol: "link", fallbackSymbol: "globe", topHex: 0x06B6D4, bottomHex: 0x0369A1),
+    IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-radix.png", symbol: "number.square.fill", fallbackSymbol: "cpu.fill", topHex: 0x10B981, bottomHex: 0x065F46),
+    IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-cidr.png", symbol: "point.3.connected.trianglepath.dotted", fallbackSymbol: "network", topHex: 0x14B8A6, bottomHex: 0x115E59),
+    IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-cert.png", symbol: "checkmark.seal.fill", fallbackSymbol: "lock.doc.fill", topHex: 0x22C55E, bottomHex: 0x15803D),
+    IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-data.png", symbol: "tablecells.fill", fallbackSymbol: "arrow.triangle.2.circlepath", topHex: 0x8B5CF6, bottomHex: 0x5B21B6),
+    IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-sql.png", symbol: "cylinder.split.1x2.fill", fallbackSymbol: "cylinder.fill", topHex: 0x0EA5E9, bottomHex: 0x1D4ED8),
 
     // tiny-shortcuts
     IconSpec(relativePath: "extensions/tiny-shortcuts/assets/shortcuts.png", symbol: "bolt.fill", fallbackSymbol: "sparkles", topHex: 0x0EA5E9, bottomHex: 0x0369A1),
@@ -130,6 +138,11 @@ let specs: [IconSpec] = [
     IconSpec(relativePath: "extensions/tiny-shortcuts/assets/cmd-clipboard.png", symbol: "doc.on.clipboard.fill", fallbackSymbol: "doc.on.doc.fill", topHex: 0x7C3AED, bottomHex: 0x5B21B6),
     IconSpec(relativePath: "extensions/tiny-shortcuts/assets/cmd-terminal.png", symbol: "terminal.fill", fallbackSymbol: "terminal", topHex: 0x27272A, bottomHex: 0x18181B),
     IconSpec(relativePath: "extensions/tiny-shortcuts/assets/cmd-finder.png", symbol: "folder.fill", fallbackSymbol: "folder", topHex: 0x2563EB, bottomHex: 0x1E40AF),
+    IconSpec(relativePath: "extensions/tiny-shortcuts/assets/cmd-ocr.png", symbol: "text.viewfinder", fallbackSymbol: "doc.text.viewfinder", topHex: 0xA855F7, bottomHex: 0x7E22CE),
+    IconSpec(relativePath: "extensions/tiny-shortcuts/assets/cmd-image.png", symbol: "photo.on.rectangle.angled", fallbackSymbol: "photo.fill", topHex: 0xF43F5E, bottomHex: 0xEA580C),
+    IconSpec(relativePath: "extensions/tiny-shortcuts/assets/cmd-caffeinate.png", symbol: "cup.and.saucer.fill", fallbackSymbol: "bolt.fill", topHex: 0xD97706, bottomHex: 0x78350F),
+    IconSpec(relativePath: "extensions/tiny-shortcuts/assets/cmd-plain-paste.png", symbol: "doc.plaintext.fill", fallbackSymbol: "doc.on.clipboard.fill", topHex: 0x64748B, bottomHex: 0x334155),
+    IconSpec(relativePath: "extensions/tiny-shortcuts/assets/cmd-dns.png", symbol: "arrow.triangle.2.circlepath.circle.fill", fallbackSymbol: "network", topHex: 0x0D9488, bottomHex: 0x047857),
 ]
 
 let rootDir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)

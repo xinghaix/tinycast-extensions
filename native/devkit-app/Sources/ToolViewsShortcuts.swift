@@ -291,6 +291,9 @@ struct QrToolView: View {
                                         showWifiBuilder.toggle()
                                     }
                                 }
+                                StudioToolBarButton(title: "扫码识别二维码 →", icon: "text.viewfinder", tint: .purple) {
+                                    studio.jump(to: .ocr)
+                                }
                                 Spacer()
                                 CopyActionButton(text: studio.qrInput, label: "复制原文本") { _ in
                                     studio.showToast("已复制二维码原文")
@@ -507,11 +510,15 @@ struct CronToolView: View {
 
 struct NetworkToolView: View {
     @Environment(StudioState.self) private var studio
+    @State private var netSubTab: Int = 0 // 0 = Interfaces & Ports, 1 = /etc/hosts
     @State private var interfaces: [NetworkInterfaceEntry] = NetworkEngine.readLocalInterfaces()
     @State private var ports: [ListeningPortEntry] = []
+    @State private var hostsEntries: [HostsEntry] = NetworkEngine.readHostsFile()
+    @State private var showDisabledHosts: Bool = false
     @State private var isLoadingPorts: Bool = false
     @State private var publicIp: String? = nil
     @State private var isFetchingPublicIp: Bool = false
+    @State private var isFlushingDns: Bool = false
     @State private var publicIpError: String? = nil
     @State private var filterText: String = ""
 
@@ -525,60 +532,112 @@ struct NetworkToolView: View {
                     || "\($0.pid)".contains(q)
                     || $0.endpoint.lowercased().contains(q)
             }
+        let filteredHosts = hostsEntries.filter { entry in
+            if !showDisabledHosts && entry.isDisabled { return false }
+            guard !q.isEmpty else { return true }
+            return entry.ip.lowercased().contains(q)
+                || entry.hostnames.joined(separator: " ").lowercased().contains(q)
+                || (entry.comment?.lowercased().contains(q) ?? false)
+        }
 
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                ToolHeader(tool: .network, subtitle: "实时枚举本机活动网卡 IPv4/IPv6、按需查询公网出口 IP，及监控并安全终止 TCP 监听进程")
+                ToolHeader(tool: .network, subtitle: "实时枚举本机活动网卡 IPv4/IPv6、查询公网 IP、监控与终止 TCP 监听端口、解析 /etc/hosts 及一键刷新 DNS 缓存")
 
                 HStack(spacing: 8) {
-                    TextField("搜索端口 / 进程名 / PID…", text: $filterText)
+                    PillButton(title: "网卡 & 监听端口 (\(ports.count))", active: netSubTab == 0, color: .teal) { netSubTab = 0 }
+                    PillButton(title: "本机 Hosts (/etc/hosts)", active: netSubTab == 1, color: .teal) {
+                        netSubTab = 1
+                        hostsEntries = NetworkEngine.readHostsFile()
+                    }
+                    Spacer()
+                    StudioToolBarButton(title: isFlushingDns ? "刷新 DNS 中…" : "刷新 DNS 缓存", icon: "arrow.triangle.2.circlepath", tint: .orange) {
+                        flushDns()
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    TextField(netSubTab == 0 ? "搜索端口 / 进程名 / PID…" : "搜索域名 / IP / 备注…", text: $filterText)
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 260)
 
-                    StudioToolBarButton(title: "刷新网卡与端口", icon: "arrow.clockwise", tint: .teal) {
+                    StudioToolBarButton(title: netSubTab == 0 ? "刷新网卡与端口" : "重读 /etc/hosts", icon: "arrow.clockwise", tint: .teal) {
                         refreshAll()
                     }
-                    StudioToolBarButton(title: isFetchingPublicIp ? "查询中…" : "查询公网 IP", icon: "globe") {
-                        queryPublicIp()
+                    if netSubTab == 0 {
+                        StudioToolBarButton(title: isFetchingPublicIp ? "查询中…" : "查询公网 IP", icon: "globe") {
+                            queryPublicIp()
+                        }
+                    } else {
+                        Toggle("显示已注释 (#) 条目", isOn: $showDisabledHosts)
+                            .toggleStyle(.checkbox)
+                            .font(.system(size: 11.5))
+                        StudioToolBarButton(title: "在 Finder 中定位", icon: "folder") {
+                            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: "/etc/hosts")])
+                        }
                     }
                     Spacer()
-                    BadgePill(text: "\(ports.count) 个监听端口", color: .teal)
+                    BadgePill(text: netSubTab == 0 ? "\(ports.count) 个监听端口" : "\(filteredHosts.count) 条 Hosts 记录", color: .teal)
                 }
 
-                StudioPanel(title: "本机网络接口与公网 IP") {
-                    if let publicIp {
-                        CopyableResultRow(title: "公网出口 IP (ipify.org)", value: publicIp, badge: "Public", badgeColor: .green)
-                    } else if let publicIpError {
-                        Text("公网 IP 查询失败: \(publicIpError)")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.orange)
-                    }
+                if netSubTab == 0 {
+                    StudioPanel(title: "本机网络接口与公网 IP") {
+                        if let publicIp {
+                            CopyableResultRow(title: "公网出口 IP (ipify.org)", value: publicIp, badge: "Public", badgeColor: .green)
+                        } else if let publicIpError {
+                            Text("公网 IP 查询失败: \(publicIpError)")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.orange)
+                        }
 
-                    if interfaces.isEmpty {
-                        Text("未检测到活动非回环网卡")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                            ForEach(interfaces) { item in
-                                CopyableResultRow(title: "\(item.iface) · \(item.family)", value: item.address, badge: item.family, badgeColor: .teal)
+                        if interfaces.isEmpty {
+                            Text("未检测到活动非回环网卡")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        } else {
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                                ForEach(interfaces) { item in
+                                    CopyableResultRow(title: "\(item.iface) · \(item.family)", value: item.address, badge: item.family, badgeColor: .teal)
+                                }
                             }
                         }
                     }
-                }
 
-                StudioPanel(title: "TCP 监听端口 (lsof -iTCP -sTCP:LISTEN)") {
-                    if isLoadingPorts && ports.isEmpty {
-                        ProgressView("正在扫描监听端口…")
-                            .padding(.vertical, 12)
-                    } else if filteredPorts.isEmpty {
-                        Text(ports.isEmpty ? "当前未发现 TCP 监听端口" : "没有匹配 \"\(filterText)\" 的监听端口")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        LazyVStack(spacing: 8) {
-                            ForEach(filteredPorts) { entry in
-                                PortRowView(entry: entry, onKill: { confirmKill(entry) })
+                    StudioPanel(title: "TCP 监听端口 (lsof -iTCP -sTCP:LISTEN)") {
+                        if isLoadingPorts && ports.isEmpty {
+                            ProgressView("正在扫描监听端口…")
+                                .padding(.vertical, 12)
+                        } else if filteredPorts.isEmpty {
+                            Text(ports.isEmpty ? "当前未发现 TCP 监听端口" : "没有匹配 \"\(filterText)\" 的监听端口")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        } else {
+                            LazyVStack(spacing: 8) {
+                                ForEach(filteredPorts) { entry in
+                                    PortRowView(entry: entry, onKill: { confirmKill(entry) })
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    StudioPanel(title: "/etc/hosts 解析视图 (只读)") {
+                        if filteredHosts.isEmpty {
+                            Text("没有匹配的 Hosts 记录")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        } else {
+                            LazyVStack(spacing: 6) {
+                                ForEach(filteredHosts) { entry in
+                                    CopyableResultRow(
+                                        title: "第 \(entry.lineNumber) 行 · \(entry.ip)" + (entry.comment.map { " · #\($0)" } ?? ""),
+                                        value: entry.hostnames.joined(separator: "  "),
+                                        badge: entry.isDisabled ? "已注释" : entry.ip,
+                                        badgeColor: entry.isDisabled ? .secondary : .teal,
+                                        secondaryButton: ("复制整行", "doc.on.doc", {
+                                            studio.copy("\(entry.ip)\t\(entry.hostnames.joined(separator: " "))", label: "已复制 Hosts 行")
+                                        })
+                                    )
+                                }
                             }
                         }
                     }
@@ -595,12 +654,25 @@ struct NetworkToolView: View {
 
     private func refreshAll() {
         interfaces = NetworkEngine.readLocalInterfaces()
+        hostsEntries = NetworkEngine.readHostsFile()
         isLoadingPorts = true
         Task {
             let list = await NetworkEngine.listListeningPorts()
             await MainActor.run {
                 ports = list
                 isLoadingPorts = false
+            }
+        }
+    }
+
+    private func flushDns() {
+        guard !isFlushingDns else { return }
+        isFlushingDns = true
+        Task {
+            let res = await NetworkEngine.flushDnsCache()
+            await MainActor.run {
+                isFlushingDns = false
+                studio.showToast(res.message, isError: !res.ok)
             }
         }
     }

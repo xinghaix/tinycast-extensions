@@ -45,6 +45,7 @@ import { generateQrSvg } from "../src/qr.ts";
 import { parseCron } from "../src/cron.ts";
 import { parseSimpleColor } from "../src/color.ts";
 import { detectClipboardKind } from "../src/clipboard-detect.ts";
+import { cleanPlainText, parseCaffeinateAction, parseDurationToSeconds } from "../src/system-shortcuts.ts";
 
 describe("UUID & Modern IDs", () => {
   it("generates compliant RFC 9562 v1/v3/v4/v5/v6/v7/v8 and inspects timestamps", () => {
@@ -253,5 +254,34 @@ describe("JSON, Text, Password, QR, Cron & Clipboard", () => {
     assert.equal(col?.hslCss, "hsl(217, 91%, 60%)");
     assert.equal(parseSimpleColor("#f0a")?.rgbCss, "rgb(255, 0, 170)");
     assert.equal(parseSimpleColor("hsl(217, 91%, 60%)")?.hexUpper, "#3C83F6");
+
+    assert.equal(detectClipboardKind("curl -X POST https://api.example.com -H 'Accept: application/json'").kind, "curl");
+    assert.equal(detectClipboardKind("10.0.12.34/22").kind, "cidr");
+    assert.equal(detectClipboardKind("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvP2bJ+6B8xP1n6rO8gO9kH8vQ7mZ3R4k5L1xM2nN0p devkit@test").kind, "cert");
+    assert.equal(detectClipboardKind("SELECT id, name FROM users WHERE id = 1").kind, "sql");
+    assert.equal(detectClipboardKind("Preparing: SELECT * FROM orders WHERE id = ?").kind, "sql");
+  });
+
+  it("parses caffeinate intents and cleans plain text safely", () => {
+    assert.equal(parseCaffeinateAction("").kind, "toggle");
+    assert.equal(parseCaffeinateAction("off").kind, "off");
+    assert.equal(parseCaffeinateAction("status").kind, "status");
+    assert.deepEqual(parseCaffeinateAction("forever"), {
+      kind: "on",
+      durationSeconds: null,
+      label: "持续保持唤醒",
+    });
+    assert.equal(parseDurationToSeconds("30m"), 1800);
+    assert.equal(parseDurationToSeconds("1h30m"), 5400);
+    assert.equal(parseDurationToSeconds("45"), 2700);
+    const act = parseCaffeinateAction("2h");
+    assert.equal(act.kind, "on");
+    if (act.kind === "on") {
+      assert.equal(act.durationSeconds, 7200);
+    }
+
+    assert.equal(cleanPlainText("\uFEFFline1\r\n  line2  \r"), "line1\n  line2  \n");
+    assert.equal(cleanPlainText("  hello  \n  world  ", "trim"), "hello\nworld");
+    assert.equal(cleanPlainText("  hello  \n\t world  ", "singleline"), "hello world");
   });
 });

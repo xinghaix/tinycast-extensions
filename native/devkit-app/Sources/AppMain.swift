@@ -89,6 +89,16 @@ private func normalizeToolArg(_ raw: String?) -> String? {
     case "encode-decode", "codec": return "codec"
     case "json-formatter", "json": return "json"
     case "color-converter", "color-picker", "color": return "color"
+    case "regex-tester", "regex": return "regex"
+    case "text-diff", "diff": return "diff"
+    case "url-parser", "url", "curl": return "url"
+    case "number-base", "radix", "bitwise": return "radix"
+    case "cidr-calculator", "cidr", "subnet": return "cidr"
+    case "data-converter", "data": return "data"
+    case "sql-formatter", "sql": return "sql"
+    case "cert-inspector", "cert", "tls", "ssh": return "cert"
+    case "ocr-scanner", "ocr": return "ocr"
+    case "image-converter", "image": return "image"
     case "password-generator", "password": return "password"
     case "text-transform", "text": return "text"
     case "qr-generator", "qr": return "qr"
@@ -271,8 +281,116 @@ private func runSelfTests() -> Never {
     check(ColorEngine.simulateCvd(ColorRGBA(r: 0.231, g: 0.510, b: 0.965)).count == 5, "CVD simulations")
     check(SmartDetector.detect("#3B82F6") == .color, "SmartDetector color")
 
-    // 6. All ToolID tabs + jump routing
+    // 6. Regex Engine
+    let reRes = RegexEngine.evaluate(
+        pattern: #"(?<user>[a-z]+)@(?<host>[a-z]+\.dev)"#,
+        input: "mail: alice@tinycast.dev, bob@tinycast.dev",
+        replacement: "${user}@example.org",
+        flags: RegexFlags()
+    )
+    check(reRes.valid && reRes.totalMatchCount == 2, "Regex matches count")
+    check(reRes.namedGroupNames == ["user", "host"], "Regex named groups")
+    check(reRes.matches.first?.groups.first?.text == "alice", "Regex capture group value")
+    check(reRes.replacedText.contains("alice@example.org"), "Regex replacement")
+    check(!RegexEngine.evaluate(pattern: "[unclosed", input: "x", replacement: "", flags: RegexFlags()).valid, "Regex invalid pattern error")
+
+    // 7. Text & JSON Semantic Diff Engine
+    let semDiff = DiffEngine.computeDiff(
+        left: #"{"b":2,"a":1,"nested":{"x":true,"y":10}}"#,
+        right: #"{"nested":{"y":20,"x":true},"a":1,"c":3}"#,
+        jsonSemantic: true,
+        ignoreWhitespace: false,
+        ignoreCase: false
+    )
+    check(semDiff.error == nil, "JSON semantic diff valid")
+    check(semDiff.jsonChanges.contains(where: { $0.path == "$.nested.y" && $0.kind == "修改" }), "JSON path change")
+    check(semDiff.jsonChanges.contains(where: { $0.path == "$.c" && $0.kind == "新增" }), "JSON path added")
+    check(semDiff.jsonChanges.contains(where: { $0.path == "$.b" && $0.kind == "删除" }), "JSON path removed")
+
+    let lineDiff = DiffEngine.computeDiff(left: "alpha\nbeta\ngamma", right: "alpha\nbeta2\ngamma", jsonSemantic: false, ignoreWhitespace: false, ignoreCase: false)
+    check(lineDiff.addedCount == 1 && lineDiff.removedCount == 1, "Text line diff counts")
+
+    // 8. URL Parser & cURL Converter
+    let urlParsed = UrlCurlEngine.parseUrl("https://api.tinycast.dev:8443/v1/items?q=hello+world&tag=mac")
+    check(urlParsed?.host == "api.tinycast.dev" && urlParsed?.port == "8443", "URL parse host/port")
+    check(urlParsed?.params.first(where: { $0.key == "q" })?.value == "hello world", "URL decode query + space")
+    let rebuilt = UrlCurlEngine.rebuildUrl(
+        scheme: "https", host: "tinycast.dev", port: "", path: "/search",
+        params: [UrlQueryParam(key: "a", value: "1 2"), UrlQueryParam(key: "off", value: "skip", enabled: false)],
+        fragment: "top"
+    )
+    check(rebuilt == "https://tinycast.dev/search?a=1%202#top", "URL rebuild")
+    let curlParsed = try! UrlCurlEngine.parseCurl(UrlCurlEngine.sampleCurl)
+    check(curlParsed.method == "POST" && curlParsed.headers.count == 3, "cURL parse")
+    check(UrlCurlEngine.toFetch(curlParsed).contains("await fetch("), "cURL to fetch")
+    check(UrlCurlEngine.toPythonRequests(curlParsed).contains("import requests"), "cURL to python")
+
+    // 9. Radix, Bitwise, chmod & CIDR
+    let rad = RadixBitwiseEngine.parse("0xDEADBEEF")!
+    check(RadixBitwiseEngine.represent(rad).decUnsigned == "3735928559", "Radix 0xDEADBEEF")
+    check(RadixBitwiseEngine.toggleBit(0, at: 5) == 32, "Bit toggle")
+    check(ChmodState.parse("755")?.symbolic == "rwxr-xr-x", "chmod 755 -> rwxr-xr-x")
+    check(ChmodState.parse("rwsr-xr-x")?.octal4 == "4755", "chmod symbolic -> 4755")
+    let c4 = CidrEngine.parseIpv4Cidr("10.0.12.34/22")!
+    check(c4.network == "10.0.12.0" && c4.broadcast == "10.0.15.255" && c4.usableCount == 1022, "IPv4 /22 CIDR")
+    check(CidrEngine.parseIpv4Cidr("192.168.1.4/31")?.usableCount == 2, "IPv4 /31 RFC3021")
+    check(CidrEngine.ipv4Contains(cidr: "10.0.12.34/22", ip: "10.0.13.99") == true, "IPv4 contains")
+    check(CidrEngine.splitIpv4("192.168.1.0/24", targetPrefix: 26).count == 4, "IPv4 subnet split")
+    let c6 = CidrEngine.parseIpv6Cidr("2001:db8:85a3::8a2e:370:7334/48")!
+    check(c6.cidrNotation == "2001:db8:85a3::/48", "IPv6 CIDR UInt128")
+
+    // 10. Multi-format Data Converter & SQL Formatter/Binder
+    let yamlConv = try! DataFormatEngine.convert(DataFormatEngine.sampleJson, from: .json, to: .yaml)
+    check(yamlConv.detected == .json && yamlConv.output.contains("service: tinycast-devkit"), "JSON -> YAML")
+    let backJson = try! DataFormatEngine.convert(yamlConv.output, from: .yaml, to: .json)
+    check(backJson.output.contains("\"port\": 8080"), "YAML -> JSON")
+    let tomlConv = try! DataFormatEngine.convert(yamlConv.output, from: .yaml, to: .toml)
+    check(tomlConv.output.contains("[server]"), "YAML -> TOML")
+    let mdTable = try! DataFormatEngine.convert(DataFormatEngine.sampleCsv, from: .csv, to: .markdownTable)
+    check(mdTable.output.contains("| auth-api | gateway | 8081 | true |"), "CSV -> Markdown Table")
+    let boundMyBatis = SqlEngine.bindParameters(sqlOrLog: SqlEngine.sampleMyBatisLog, manualParams: "", formatOutput: false)
+    check(boundMyBatis.params.count == 5 && boundMyBatis.renderedSql.contains("tenant_id = 10042") && boundMyBatis.renderedSql.contains("'active'"), "SQL MyBatis bind")
+    check(SqlEngine.format("select id,name from users where active=1;").contains("FROM users"), "SQL format")
+
+    // 11. X.509 DER & OpenSSH Key Parser
+    let selfDer = CertEngine.buildSelfTestDerCert()
+    let parsedCert = try! CertEngine.parseX509Certificate(der: selfDer)
+    check(parsedCert.subjectCommonName == "devkit.tinycast.test" && parsedCert.sanEntries.contains("DNS: tinycast.local"), "X.509 DER parse")
+    let parsedSsh = CertEngine.parseSshPublicKey(CertEngine.sampleSshKey)
+    check(parsedSsh?.algorithmLabel == "Ed25519" && parsedSsh?.sha256Fingerprint.hasPrefix("SHA256:") == true, "SSH public key parse")
+
+    // 12. Vision QR Barcode Decode + ImageIO Convert/EXIF Strip
+    let paddedQrPng: Data = {
+        let img = qr!.image
+        let side = 240
+        let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8,
+            samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        )!
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        NSColor.white.setFill()
+        NSRect(x: 0, y: 0, width: side, height: side).fill()
+        img.draw(in: NSRect(x: 24, y: 24, width: side - 48, height: side - 48))
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.representation(using: .png, properties: [:])!
+    }()
+    let visionRes = try! VisionImageEngine.scanImageDataSync(paddedQrPng)
+    check(visionRes.barcodes.contains(where: { $0.payload.contains("tinycast") }), "Vision barcode decode")
+    let jpgConv = try! ImageToolEngine.convertImageDataSync(paddedQrPng, format: .jpeg, quality: 0.85, maxWidth: 120, scalePercent: nil, stripMetadata: true)
+    check(jpgConv.width == 120 && jpgConv.height == 120 && jpgConv.dataUri.hasPrefix("data:image/jpeg;base64,"), "ImageIO convert + resize + DataURI")
+
+    // 13. Hosts parser & SmartDetector expanded kinds
+    let hosts = NetworkEngine.readHostsFile()
+    check(hosts.contains(where: { $0.hostnames.contains("localhost") }), "Hosts /etc/hosts parse")
+    check(SmartDetector.detect("10.0.12.34/22") == .cidr, "SmartDetector CIDR")
+    check(SmartDetector.detect(UrlCurlEngine.sampleCurl) == .curl, "SmartDetector cURL")
+    check(SmartDetector.detect(SqlEngine.sampleMyBatisLog) == .sql, "SmartDetector SQL")
+    check(SmartDetector.detect(CertEngine.sampleSshKey) == .certOrSsh, "SmartDetector SSH")
+
+    // 14. All ToolID tabs + jump routing (22 tools)
     let studio = StudioState()
+    check(ToolID.allCases.count == 22, "22 Studio tools registered")
     for tool in ToolID.allCases {
         studio.jump(to: tool, searchTerm: tool == .hash ? "md5" : (tool == .codec ? "jwt" : ""))
         check(studio.activeTool == tool, "Switch tool \(tool.rawValue)")
@@ -450,6 +568,16 @@ struct StudioRootView: View {
         case .codec: CodecToolView()
         case .json: JsonToolView()
         case .color: ColorToolView()
+        case .regex: RegexToolView()
+        case .diff: DiffToolView()
+        case .url: UrlCurlToolView()
+        case .radix: RadixToolView()
+        case .cidr: CidrToolView()
+        case .dataFormat: DataFormatToolView()
+        case .sql: SqlToolView()
+        case .cert: CertToolView()
+        case .ocr: OcrScannerToolView()
+        case .image: ImageConverterToolView()
         case .password: PasswordToolView()
         case .text: TextToolView()
         case .qr: QrToolView()

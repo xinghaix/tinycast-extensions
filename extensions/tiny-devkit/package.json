@@ -112,6 +112,78 @@
       "keywords": ["color", "hex", "rgb", "hsl", "oklch", "wcag", "contrast", "eyedropper", "picker", "tailwind", "颜色", "色值", "取色", "对比度"]
     },
     {
+      "name": "regex-tester",
+      "title": "Regex 正则实验室",
+      "subtitle": "实时匹配高亮 / 命名捕获组 / 模板替换",
+      "description": "在原生悬浮工作台中测试正则表达式，实时高亮匹配与命名捕获组、执行 $1 / ${name} 替换与 Split 拆分",
+      "mode": "no-view",
+      "icon": "cmd-regex.png",
+      "keywords": ["regex", "regexp", "match", "capture", "replace", "pattern", "正则", "匹配", "捕获"]
+    },
+    {
+      "name": "text-diff",
+      "title": "文本与 JSON 语义 Diff",
+      "subtitle": "字符级增删高亮 · 忽略键序语义对比",
+      "description": "在原生悬浮工作台中进行左右分栏 / 统一补丁文本对比，支持 JSON 键排序语义 Diff 与路径变更清单",
+      "mode": "no-view",
+      "icon": "cmd-diff.png",
+      "keywords": ["diff", "compare", "patch", "json", "contrast", "对比", "差异", "语义"]
+    },
+    {
+      "name": "url-parser",
+      "title": "URL 解析与 cURL 互转",
+      "subtitle": "Query 可视化编辑 · cURL 转 Fetch/Py/Go/Swift",
+      "description": "在原生悬浮工作台中拆解并编辑 URL Query 参数实时编解码拼回，以及将 cURL 命令转为多语言请求代码",
+      "mode": "no-view",
+      "icon": "cmd-url.png",
+      "keywords": ["url", "uri", "query", "curl", "fetch", "python", "httpie", "golang", "链接", "参数", "请求"]
+    },
+    {
+      "name": "number-base",
+      "title": "进制与 64 位位运算面板",
+      "subtitle": "BIN / OCT / DEC / HEX / chmod / 存储单位",
+      "description": "在原生悬浮工作台中互转进制、点击翻转 64-bit 二进制位格、大小端字节序及 chmod 权限矩阵",
+      "mode": "no-view",
+      "icon": "cmd-radix.png",
+      "keywords": ["radix", "binary", "hex", "octal", "bit", "bitwise", "chmod", "endian", "进制", "位运算", "权限"]
+    },
+    {
+      "name": "cidr-calculator",
+      "title": "CIDR 与子网计算器",
+      "subtitle": "IPv4 / IPv6 网段 / 掩码 / 广播 / 子网划分",
+      "description": "在原生悬浮工作台中计算 IPv4/IPv6 CIDR 网段、可用主机范围、IP 归属测试与等分子网划分",
+      "mode": "no-view",
+      "icon": "cmd-cidr.png",
+      "keywords": ["cidr", "subnet", "ipv4", "ipv6", "netmask", "broadcast", "子网", "掩码", "网段"]
+    },
+    {
+      "name": "cert-inspector",
+      "title": "TLS / X.509 证书与 SSH 公钥解析",
+      "subtitle": "PEM/DER · 远程 HTTPS 链 · SAN · Randomart",
+      "description": "在原生悬浮工作台中解析 PEM/DER 证书与 SAN 有效期、按需拉取线上 HTTPS 证书链及 OpenSSH 公钥指纹",
+      "mode": "no-view",
+      "icon": "cmd-cert.png",
+      "keywords": ["cert", "tls", "ssl", "x509", "pem", "ssh", "pubkey", "fingerprint", "证书", "公钥", "指纹"]
+    },
+    {
+      "name": "data-converter",
+      "title": "多格式数据互转",
+      "subtitle": "JSON / YAML / TOML / .env / CSV ↔ Markdown 表格",
+      "description": "在原生悬浮工作台中无损互转 JSON、YAML、TOML、.env、CSV 与对齐 Markdown 表格",
+      "mode": "no-view",
+      "icon": "cmd-data.png",
+      "keywords": ["json", "yaml", "toml", "env", "csv", "markdown", "table", "表格", "互转", "配置"]
+    },
+    {
+      "name": "sql-formatter",
+      "title": "SQL 格式化与 ORM 日志还原",
+      "subtitle": "排版压缩 · MyBatis / GORM 参数回填",
+      "description": "在原生悬浮工作台中美化/压缩 SQL，并一键还原 MyBatis / PostgreSQL 日志中的 ?, $1, :name 占位符",
+      "mode": "no-view",
+      "icon": "cmd-sql.png",
+      "keywords": ["sql", "format", "mybatis", "gorm", "prisma", "orm", "bind", "日志", "参数"]
+    },
+    {
       "name": "quick-uuid-v4",
       "title": "快速生成 UUID v4",
       "subtitle": "直接复制并提示",
