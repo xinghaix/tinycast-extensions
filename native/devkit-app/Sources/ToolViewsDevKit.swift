@@ -89,6 +89,7 @@ struct SmartClipboardView: View {
         ("Base64 文本", "SGVsbG8sIFdvcmxkISAtIFRpbnljYXN0IERldktpdA=="),
         ("JWT Token", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzQyIiwibmFtZSI6IlRpbnljYXN0IiwiaWF0IjoxNzMxODMwNDAwfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
         ("CIDR 网段", "10.0.12.34/22"),
+        ("美元金额", "$199.50"),
         ("cURL 请求", UrlCurlEngine.sampleCurl),
         ("SQL 参数日志", SqlEngine.sampleMyBatisLog),
         ("SSH 公钥", CertEngine.sampleSshKey),
@@ -385,6 +386,35 @@ struct SmartClipboardView: View {
                     }
                 }
                 CopyableResultRow(title: "格式化 SQL 预览", value: bound.formattedSql, badge: "SQL", badgeColor: .blue)
+            }
+        }
+
+        if kind == .currency, let parsed = CurrencyEngine.parseCurrencyQuery(trimmed) {
+            let snap = CurrencyEngine.loadDiskCache() ?? CurrencyEngine.offlineFallbackSnapshot
+            let srcMeta = CurrencyEngine.meta(for: parsed.code)
+            let targets = ["CNY", "USD", "HKD", "JPY", "EUR", "GBP"].filter { $0 != parsed.code }
+            StudioPanel(title: "识别为货币金额 · \(srcMeta.flag) \(CurrencyEngine.formatAmount(parsed.amount, code: parsed.code)) \(parsed.code) (\(snap.providerName))") {
+                HStack {
+                    BadgePill(text: snap.rateDate, color: .green)
+                    Spacer()
+                    StudioToolBarButton(title: "前往汇率计算器 →", icon: "banknote", tint: .green) {
+                        studio.currencyBaseCode = parsed.code
+                        studio.currencyTargetCode = (parsed.code == "CNY" ? "USD" : "CNY")
+                        studio.currencyAmountInput = CurrencyEngine.formatCopyPlain(parsed.amount, code: parsed.code)
+                        studio.jump(to: .currency)
+                    }
+                }
+                ForEach(targets, id: \.self) { tCode in
+                    if let converted = CurrencyEngine.convert(amount: parsed.amount, from: parsed.code, to: tCode, snapshot: snap) {
+                        let tMeta = CurrencyEngine.meta(for: tCode)
+                        CopyableResultRow(
+                            title: "\(tMeta.flag) \(tMeta.nameZh) (\(tCode))",
+                            value: CurrencyEngine.formatCopyPlain(converted, code: tCode),
+                            badge: "\(tMeta.symbol) \(CurrencyEngine.formatAmount(converted, code: tCode))",
+                            badgeColor: .green
+                        )
+                    }
+                }
             }
         }
 

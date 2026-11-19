@@ -21,6 +21,7 @@ export type StudioToolId =
   | "sql"
   | "ocr"
   | "image"
+  | "currency"
   | "password"
   | "text"
   | "qr"

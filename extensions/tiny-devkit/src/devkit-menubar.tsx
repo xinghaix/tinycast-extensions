@@ -171,6 +171,7 @@ export default function Command() {
         <MenuBarExtra.Item icon={Icon.Link} title="URL & cURL 互转…" onAction={() => openStudio("url")} />
         <MenuBarExtra.Item icon={Icon.Text} title="苹果 Vision 离线 OCR…" onAction={() => openStudio("ocr")} />
         <MenuBarExtra.Item icon={Icon.Image} title="图片转换与去 EXIF…" onAction={() => openStudio("image")} />
+        <MenuBarExtra.Item icon={Icon.BankNote} title="各国汇率计算器…" onAction={() => openStudio("currency")} />
         <MenuBarExtra.Item icon={Icon.Lock} title="TLS 证书 & SSH 公钥…" onAction={() => openStudio("cert")} />
         <MenuBarExtra.Item icon={Icon.Key} title="密码与密钥生成器…" onAction={() => openStudio("password")} />
         <MenuBarExtra.Item icon={Icon.Globe} title="本机 IP / 端口 / Hosts…" onAction={() => openStudio("network")} />

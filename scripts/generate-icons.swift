@@ -127,6 +127,7 @@ let specs: [IconSpec] = [
     IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-cert.png", symbol: "checkmark.seal.fill", fallbackSymbol: "lock.doc.fill", topHex: 0x22C55E, bottomHex: 0x15803D),
     IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-data.png", symbol: "tablecells.fill", fallbackSymbol: "arrow.triangle.2.circlepath", topHex: 0x8B5CF6, bottomHex: 0x5B21B6),
     IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-sql.png", symbol: "cylinder.split.1x2.fill", fallbackSymbol: "cylinder.fill", topHex: 0x0EA5E9, bottomHex: 0x1D4ED8),
+    IconSpec(relativePath: "extensions/tiny-devkit/assets/cmd-currency.png", symbol: "banknote.fill", fallbackSymbol: "dollarsign.circle.fill", topHex: 0x16A34A, bottomHex: 0x047857),
 
     // tiny-shortcuts
     IconSpec(relativePath: "extensions/tiny-shortcuts/assets/shortcuts.png", symbol: "bolt.fill", fallbackSymbol: "sparkles", topHex: 0x0EA5E9, bottomHex: 0x0369A1),

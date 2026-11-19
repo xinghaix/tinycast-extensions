@@ -1077,7 +1077,7 @@ enum NetworkEngine {
 // MARK: - Smart Clipboard Detection
 
 enum SmartClipboardKind: Sendable {
-    case empty, uuidOrId, jwt, timestamp, json, certOrSsh, curl, url, cidr, color, base64, hex, sql, text
+    case empty, uuidOrId, jwt, timestamp, json, certOrSsh, curl, url, cidr, color, currency, base64, hex, sql, text
 
     var label: String {
         switch self {
@@ -1091,6 +1091,7 @@ enum SmartClipboardKind: Sendable {
         case .url: return "URL / 链接参数"
         case .cidr: return "CIDR 网段"
         case .color: return "颜色 / 色值"
+        case .currency: return "货币金额 / 汇率"
         case .base64: return "Base64 编码内容"
         case .hex: return "Hex 十六进制内容"
         case .sql: return "SQL 语句 / ORM 日志"
@@ -1127,6 +1128,7 @@ enum SmartDetector {
             return .hex
         }
         if ColorEngine.parse(s) != nil { return .color }
+        if CurrencyEngine.parseCurrencyQuery(s) != nil { return .currency }
         if CodecEngine.decodeBase64Strict(s) != nil { return .base64 }
         if let hex = CodecEngine.decodeHexBytes(s), CodecEngine.looksReadableUtf8(hex) { return .hex }
         if s.contains("Preparing:") ||

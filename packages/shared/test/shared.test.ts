@@ -260,6 +260,9 @@ describe("JSON, Text, Password, QR, Cron & Clipboard", () => {
     assert.equal(detectClipboardKind("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvP2bJ+6B8xP1n6rO8gO9kH8vQ7mZ3R4k5L1xM2nN0p devkit@test").kind, "cert");
     assert.equal(detectClipboardKind("SELECT id, name FROM users WHERE id = 1").kind, "sql");
     assert.equal(detectClipboardKind("Preparing: SELECT * FROM orders WHERE id = ?").kind, "sql");
+    assert.equal(detectClipboardKind("$199.50").kind, "currency");
+    assert.equal(detectClipboardKind("5000 JPY").kind, "currency");
+    assert.equal(detectClipboardKind("1731830400").kind, "timestamp");
   });
 
   it("parses caffeinate intents and cleans plain text safely", () => {

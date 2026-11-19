@@ -10,7 +10,7 @@
 
 采用 **「无视图极速命令 + 纯原生 SwiftUI & AppKit 独立悬浮工作台」混合架构**：
 - 零 Chromium / WKWebView 内存开销（打开工作台约占 ~30–40 MB 内存，关闭窗口即刻退出释放至 **0 MB**）。
-- 100% 本地离线运算与原生 Apple 框架集成（调用 Vision / Security / ImageIO / CoreGraphics，仅在用户主动点击「查询公网 IP」或「拉取 TLS 证书链」时发起外网请求）。
+- 100% 本地离线运算与原生 Apple 框架集成（调用 Vision / Security / ImageIO / CoreGraphics，仅在用户主动点击「查询公网 IP」「拉取 TLS 证书链」或使用「汇率换算」刷新公开无密钥牌价时发起只读外网请求）。
 - 兼容 Apple Silicon (`arm64`) 与 Intel (`x86_64`) 的 Universal 原生 `tinycast-devkit` 二进制。
 
 ---
@@ -19,7 +19,7 @@
 
 - [核心交互设计](#核心交互设计)
 - [安装指南](#安装指南)
-- [功能总览（33 个命令）](#功能总览33-个命令)
+- [功能总览（34 个命令）](#功能总览34-个命令)
 - [快捷键与使用技巧](#快捷键与使用技巧)
 - [升级与卸载](#升级与卸载)
 - [常见问题 (FAQ)](#常见问题-faq)
@@ -29,7 +29,7 @@
 
 ## 核心交互设计
 
-1. **纯净无干扰搜索入口**：所有 23 个工作台直达命令均以 `no-view` 极速启动器注册，去除了搜索栏参数占位框，选中回车即可直接唤起对应工具页。
+1. **纯净无干扰搜索入口**：所有 24 个工作台直达命令均以 `no-view` 极速启动器注册，去除了搜索栏参数占位框，选中回车即可直接唤起对应工具页。
 2. **内核级 `flock` 单实例悬浮窗**：无论从 Tinycast 搜索栏还是菜单栏连续点击多个工具，始终复用同一个原生悬浮窗秒切面板，绝不会同时弹出多个重复窗口。
 3. **点击即复制且保持窗口**：工作台内的每一项结果均支持：
    - **直接左键点击结果文本**复制；
@@ -53,7 +53,7 @@
 2. 解压下载的压缩包，任选以下一种方式导入：
    - **图形界面导入**：打开 **Tinycast 设置 → 扩展 → 安装 → `Add from folder` (选取…)**，分别选取解压出的 `tiny-devkit` 和 `tiny-shortcuts` 文件夹。
    - **脚本一键安装**：在解压目录打开终端执行 `./install.sh`（自动关闭旧工作台进程并安装至 Tinycast 扩展目录）。
-3. **重启一次 Tinycast**（或在设置页刷新扩展），即可使用全部 33 个命令与菜单栏工具。
+3. **重启一次 Tinycast**（或在设置页刷新扩展），即可使用全部 34 个命令与菜单栏工具。
 
 ### 方式二：从源码编译安装
 
@@ -74,13 +74,13 @@ pnpm install-local  # 安装到 ~/Library/Application Support/com.abueammar.tiny
 
 ---
 
-## 功能总览（33 个命令）
+## 功能总览（34 个命令）
 
-### 1. `tiny-devkit` — DevKit 开发者工具箱（19 个命令）
+### 1. `tiny-devkit` — DevKit 开发者工具箱（20 个命令）
 
 | 命令 | 模式 | 功能亮点 |
 | --- | --- | --- |
-| **DevKit 原生多工具工作台** (`workbench`) | `no-view` → Studio | 默认打开「剪贴板智能工作台」，侧边栏同窗集成全部 22 款开发者工具。 |
+| **DevKit 原生多工具工作台** (`workbench`) | `no-view` → Studio | 默认打开「剪贴板智能工作台」，侧边栏同窗集成全部 23 款开发者工具。 |
 | **UUID 与 ID 生成器** (`uuid-generator`) | `no-view` → Studio | **UUID v1/v3/v4/v5/v6/v7/v8/Nil/Max** + **ULID / NanoID / KSUID / ObjectID**；格式切换、1–50 批量（按行 / JSON / CSV / SQL IN）及实时结构拆解与 10 种变体。 |
 | **时间戳转换** (`timestamp-converter`) | `no-view` → Studio | 实时秒表 + 自动识别 Unix `s`/`ms`/`μs`/`ns`、ISO 8601、紧凑日期、`+2h`/`today+1d` 相对表达式，配备原生 `DatePicker`、8 大时区与 JS/Py/Go/SQL 代码片段。 |
 | **Hash 与文件校验** (`hash-generator`) | `no-view` → Studio | 支持 **MD5、SHA-1/224/256/384/512、SHA-3、Keccak-256、BLAKE3、BLAKE2b/2s、国密 SM3、RIPEMD-160、CRC32/32C、Adler-32、FNV-1a、MurmurHash3**、HMAC 与期望值高亮比对；支持**拖拽/选取本地大文件 1 MB 流式分块计算**。 |
@@ -95,6 +95,7 @@ pnpm install-local  # 安装到 ~/Library/Application Support/com.abueammar.tiny
 | **TLS / X.509 证书与 SSH 公钥解析** (`cert-inspector`) | `no-view` → Studio | 离线 ASN.1 DER 解析 PEM/DER 证书链、SAN 与有效期预警；支持按需拉取线上 HTTPS 证书链；解析 OpenSSH 公钥 SHA-256/MD5 指纹与 **Drunken Bishop Randomart**。 |
 | **多格式数据互转** (`data-converter`) | `no-view` → Studio | **JSON / YAML / TOML / `.env` / CSV / Markdown 表格** 自动识别与保留键序互转，接口 JSON 或 CSV 一键导出对齐 Markdown 表格。 |
 | **SQL 格式化与 ORM 日志还原** (`sql-formatter`) | `no-view` → Studio | SQL 关键词大小写转换与美化/压缩；支持粘贴 **MyBatis (`Preparing:` + `Parameters:`)** 日志或 PostgreSQL `$1` / `:name` 参数一键回填为可执行 SQL。 |
+| **各国汇率计算器** (`currency-converter`) | `no-view` → Studio | 多源无密钥公开牌价（`fawazahmed0 CDN` / `ExchangeRate-API` / `Frankfurter` 自动容灾 + 4 小时本地缓存 + 内置离线兜底），覆盖 **166+ 法币 / 加密 / 黄金**；支持四则表达式、银行点差估算与 **30/90 天历史走势图**。 |
 | **快速生成 UUID v4** (`quick-uuid-v4`) | `no-view` | 无视图即时生成并复制 UUID v4（支持 `Count` 参数批量复制）。 |
 | **快速生成 UUID v7** (`quick-uuid-v7`) | `no-view` | 无视图即时生成时序有序 UUID v7 并复制。 |
 | **快速复制当前时间戳** (`quick-timestamp`) | `no-view` | 无视图一键复制当前 Unix 秒/毫秒/ISO 时间戳。 |
@@ -160,8 +161,8 @@ pnpm install --frozen-lockfile
 pnpm run check:hygiene      # 检查 Manifest/资源完整性，拦截本地路径与敏感信息
 pnpm typecheck              # TypeScript 类型检查
 pnpm test                   # 运行 TS 共享引擎单元测试
-pnpm build:universal        # 构建 arm64 + x86_64 Universal 二进制与全部 33 个扩展包
-pnpm verify:ci              # 独立模式验证（所有 33 个 CJS 导出、codesign、--self-test、5 进程并发 flock）
+pnpm build:universal        # 构建 arm64 + x86_64 Universal 二进制与全部 34 个扩展包
+pnpm verify:ci              # 独立模式验证（所有 34 个 CJS 导出、codesign、--self-test、5 进程并发 flock）
 pnpm verify                 # 若同级存在 ../tinycast，自动额外运行完整 Tinycast runtime harness
 ```
 

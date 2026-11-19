@@ -34,6 +34,7 @@ const STUDIO_LAUNCHER_COMMANDS = new Set([
   "cert-inspector",
   "data-converter",
   "sql-formatter",
+  "currency-converter",
   "password-generator",
   "text-transform",
   "qr-generator",
@@ -351,6 +352,9 @@ async function verifyWithTinycastHarness(devkitDir, shortcutsDir) {
   await verifyStudioLauncher(devkitDir, "color-converter", {
     selectedText: "#3B82F6",
   });
+  await verifyStudioLauncher(devkitDir, "currency-converter", {
+    selectedText: "$199.50",
+  });
 
   // Stale in-memory `mode: "view"` 3x replay guard regression test
   {
@@ -487,7 +491,7 @@ async function verifyAll() {
     console.log("\n(Tinycast runtime harness not detected locally; completed standalone CI verification.)");
   }
 
-  console.log("\nAll 33 extension commands and 22 native DevKit Studio tools passed cleanly!");
+  console.log("\nAll 34 extension commands and 23 native DevKit Studio tools passed cleanly!");
 }
 
 await verifyAll();
